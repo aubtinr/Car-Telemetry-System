@@ -82,34 +82,30 @@ static void can_start(void)
 
     print_text("Configuring CAN filter...\r\n");
 
-    HAL_StatusTypeDef status = HAL_CAN_ConfigFilter(&hcan1, &filter);
-
-    if (status != HAL_OK)
+    if (HAL_CAN_ConfigFilter(&hcan1, &filter) != HAL_OK)
     {
-        snprintf(msg, sizeof(msg),
-                 "CAN filter FAILED: status=%d error=0x%08lX\r\n",
-                 (int)status,
-                 (unsigned long)HAL_CAN_GetError(&hcan1));
-        print_text(msg);
+        print_text("CAN filter configuration FAILED\r\n");
         return;
     }
 
     print_text("CAN filter configured!\r\n");
+
+    // NEW: Check state immediately before starting CAN
+    snprintf(msg, sizeof(msg),
+             "CAN state before start: %d\r\n",
+             (int)HAL_CAN_GetState(&hcan1));
+    print_text(msg);
+
     print_text("Starting CAN peripheral...\r\n");
 
-    status = HAL_CAN_Start(&hcan1);
+    HAL_StatusTypeDef status = HAL_CAN_Start(&hcan1);
 
-    if (status != HAL_OK)
-    {
-        snprintf(msg, sizeof(msg),
-                 "CAN start FAILED: status=%d error=0x%08lX\r\n",
-                 (int)status,
-                 (unsigned long)HAL_CAN_GetError(&hcan1));
-        print_text(msg);
-        return;
-    }
-
-    print_text("CAN started successfully!\r\n");
+    snprintf(msg, sizeof(msg),
+             "CAN start status=%d, state=%d, error=0x%08lX\r\n",
+             (int)status,
+             (int)HAL_CAN_GetState(&hcan1),
+             (unsigned long)HAL_CAN_GetError(&hcan1));
+    print_text(msg);
 }
 
 static void read_pid(uint8_t pid)
@@ -146,25 +142,69 @@ static void read_pid(uint8_t pid)
             continue;
         /* 0x41 = positive reply to Mode 01 (current sensor data). */
         if (data[1] != 0x41 || data[2] != pid) continue;
-        if (pid == 0x0C && rx.DLC >= 5 && data[0] == 4) {
-            unsigned int rpm = (((unsigned int)data[3] << 8) | data[4]) / 4;
-            snprintf(line, sizeof(line), "RPM: %u\r\n", rpm);
-            print_text(line);
-            return;
+
+        uint8_t A = data[3];
+        uint8_t B = (rx.DLC >= 5) ? data[4] : 0;
+
+        switch (pid) {
+            case 0x0C: { // Engine RPM
+                if (data[0] != 4 || rx.DLC < 5) break;
+                float rpm = ((A * 256.0f) + B) / 4.0f;
+                snprintf(line, sizeof(line), "RPM: %.0f\r\n", rpm);
+                print_text(line);
+                return;
+            }
+
+            case 0x05: { // Coolant temperature
+                if (data[0] != 3) break;
+                int temp = (int)A - 40;
+                snprintf(line, sizeof(line), "Coolant: %d C\r\n", temp);
+                print_text(line);
+                return;
+            }
+
+            case 0x0D: { // Vehicle speed
+                if (data[0] != 3) break;
+                snprintf(line, sizeof(line), "Speed: %u km/h\r\n", A);
+                print_text(line);
+                return;
+            }
+
+            case 0x10: { // Mass airflow
+                if (data[0] != 4 || rx.DLC < 5) break;
+                float maf = ((A * 256.0f) + B) / 100.0f;
+                snprintf(line, sizeof(line), "MAF: %.2f g/s\r\n", maf);
+                print_text(line);
+                return;
+            }
+
+            case 0x11: { // Throttle position
+                if (data[0] != 3) break;
+                float throttle = (A * 100.0f) / 255.0f;
+                snprintf(line, sizeof(line), "Throttle: %.1f%%\r\n", throttle);
+                print_text(line);
+                return;
+            }
+
+            case 0x14: { // O2 Sensor 1 voltage
+                if (data[0] != 4 || rx.DLC < 5) break;
+
+                // Voltage = A / 200 volts
+                uint32_t millivolts = (uint32_t)A * 5;
+
+                snprintf(line, sizeof(line),
+                         "O2 Voltage: %lu.%03lu V\r\n",
+                         (unsigned long)(millivolts / 1000),
+                         (unsigned long)(millivolts % 1000));
+
+                print_text(line);
+                return;
+            }
         }
-        if (pid == 0x0D && data[0] == 3) {
-            snprintf(line, sizeof(line), "Speed: %u km/h\r\n",
-                     (unsigned int)data[3]);
-            print_text(line);
-            return;
-        }
+
     }
     HAL_CAN_AbortTxRequest(&hcan1, mailbox);
-    snprintf(line, sizeof(line),
-             "No reply PID 0x%02X; HAL error=0x%08lX ESR=0x%08lX\r\n",
-             (unsigned int)pid, (unsigned long)HAL_CAN_GetError(&hcan1),
-             (unsigned long)CAN1->ESR);
-    print_text(line);
+
 }
 /* USER CODE END 0 */
 
@@ -200,17 +240,19 @@ int main(void)
   MX_CAN1_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
+
+  print_text("Checking CAN state...\r\n");
+
   char msg[100];
-
   snprintf(msg, sizeof(msg),
-           "CAN state=%d, error=0x%08lX\r\n",
-           (int)HAL_CAN_GetState(&hcan1),
-           (unsigned long)HAL_CAN_GetError(&hcan1));
-
+           "CAN state: %d\r\n",
+           (int)HAL_CAN_GetState(&hcan1));
   print_text(msg);
+
   print_text("\r\nOBD simulator test: CAN1 500 kbps\r\n");
   print_text("Starting CAN...\r\n");
   can_start();
+
   /* USER CODE END 2 */
 
   /* Initialize leds */
@@ -227,11 +269,23 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	read_pid(0x0C);   // Engine RPM
-	HAL_Delay(100);
+	  read_pid(0x0C);   // Engine RPM
+	  HAL_Delay(100);
 
-	read_pid(0x0D);   // Vehicle speed
-	HAL_Delay(800);
+	  read_pid(0x05);   // Coolant temperature
+	  HAL_Delay(100);
+
+	  read_pid(0x0D);   // Vehicle speed
+	  HAL_Delay(100);
+
+	  read_pid(0x10);   // MAF
+	  HAL_Delay(100);
+
+	  read_pid(0x11);   // Throttle position
+	  HAL_Delay(100);
+
+	  read_pid(0x14);  // O2 Sensor 1 voltage
+	  HAL_Delay(100);
   }
   /* USER CODE END 3 */
 }
@@ -299,7 +353,7 @@ static void MX_CAN1_Init(void)
   hcan1.Init.TimeSeg1 = CAN_BS1_13TQ;
   hcan1.Init.TimeSeg2 = CAN_BS2_2TQ;
   hcan1.Init.TimeTriggeredMode = DISABLE;
-  hcan1.Init.AutoBusOff = DISABLE; // TODO: may want to change later
+  hcan1.Init.AutoBusOff = DISABLE;
   hcan1.Init.AutoWakeUp = DISABLE;
   hcan1.Init.AutoRetransmission = DISABLE;
   hcan1.Init.ReceiveFifoLocked = DISABLE;
