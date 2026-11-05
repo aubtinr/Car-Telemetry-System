@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# Node / frontend
+node_modules/
+frontend/dist/
+.vite/
+
+# Backend serves this built copy of the UI
+backend/static/
+
+# Logs / data
+logs/
+*.csv
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.log
