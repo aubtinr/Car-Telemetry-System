@@ -47,6 +47,9 @@ export function startClientMock(onEnvelope: (env: Envelope) => void): () => void
       stale[f] = false;
     }
 
+    // Alternate 20 s with no codes / 20 s with two, so both panel states show.
+    const showCodes = Math.floor(t / 20) % 2 === 1;
+
     seq = (seq + 1) % 0xffffffff;
     const env: Envelope = {
       type: "telemetry_update",
@@ -68,12 +71,18 @@ export function startClientMock(onEnvelope: (env: Envelope) => void): () => void
         supported,
         stale,
       },
+      dtc: {
+        status: "ok",
+        codes: showCodes ? ["P0301", "P0420"] : [],
+        age_ms: 0,
+        stale: false,
+      },
     };
     onEnvelope(env);
   };
 
   tick();
-  const id = window.setInterval(tick, 200); // 5 Hz
+  const id = window.setInterval(tick, 100); // 10 Hz
   return () => window.clearInterval(id);
 }
 

@@ -27,12 +27,25 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-
+/* Reassembly state for one ECU's multi-frame (ISO-TP) response. */
+typedef struct
+{
+  uint8_t active;
+  uint16_t total_len;
+  uint16_t rx_len;
+  uint8_t next_sn;
+  uint8_t buf[70];
+} isotp_rx_t;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define OBD_RESPONSE_TIMEOUT_MS 50U  /* ISO 15765-4 P2CAN max */
+#define FRAME_MIN_PERIOD_MS 50U      /* caps the frame rate at 20 Hz */
+#define DTC_PERIOD_MS 5000U
+#define DTC_TIMEOUT_MS 100U          /* wait this long after the last DTC reply */
+#define DTC_MAX 32U
+#define OBD_ECU_COUNT 8U             /* response IDs 0x7E8..0x7EF */
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -112,7 +125,7 @@ static uint8_t read_pid(uint8_t pid, uint8_t data_length, uint8_t raw_data[2])
   }
 
   start = HAL_GetTick();
-  while ((uint32_t)(HAL_GetTick() - start) < 150U)
+  while ((uint32_t)(HAL_GetTick() - start) < OBD_RESPONSE_TIMEOUT_MS)
   {
     if (HAL_CAN_GetRxFifoFillLevel(&hcan1, CAN_RX_FIFO0) == 0U)
     {
@@ -228,6 +241,195 @@ static void emit_frame(uint32_t seq,
   used += (size_t)written;
   HAL_UART_Transmit(&huart2, (uint8_t *)line, (uint16_t)used, 200U);
 }
+
+/* payload: 0x43, DTC count, then two bytes per DTC (0x0000 = padding). */
+static void add_dtcs(const uint8_t *payload, uint16_t len,
+           uint16_t dtcs[DTC_MAX], uint8_t *dtc_count)
+{
+  for (uint16_t i = 2U; (uint16_t)(i + 1U) < len; i += 2U)
+  {
+    const uint16_t dtc = (uint16_t)((payload[i] << 8) | payload[i + 1U]);
+    uint8_t seen = 0U;
+
+    if (dtc == 0U)
+    {
+      continue;
+    }
+    for (uint8_t j = 0U; j < *dtc_count; j++)
+    {
+      if (dtcs[j] == dtc)
+      {
+        seen = 1U;
+        break;
+      }
+    }
+    if (seen == 0U && *dtc_count < DTC_MAX)
+    {
+      dtcs[(*dtc_count)++] = dtc;
+    }
+  }
+}
+
+static void send_flow_control(uint32_t ecu_request_id)
+{
+  CAN_TxHeaderTypeDef tx = {0};
+  uint8_t fc[8] = {0x30, 0, 0, 0, 0, 0, 0, 0};  /* clear to send, no block limit, no gap */
+  uint32_t mailbox;
+
+  tx.StdId = ecu_request_id;
+  tx.IDE = CAN_ID_STD;
+  tx.RTR = CAN_RTR_DATA;
+  tx.DLC = 8;
+  tx.TransmitGlobalTime = DISABLE;
+  (void)HAL_CAN_AddTxMessage(&hcan1, &tx, fc, &mailbox);
+}
+
+/* Mode 03: collect stored DTCs from every ECU that answers.
+   Returns the number of ECUs that sent a complete response. */
+static uint8_t read_dtcs(uint16_t dtcs[DTC_MAX], uint8_t *dtc_count)
+{
+  static isotp_rx_t isotp[OBD_ECU_COUNT];
+  CAN_TxHeaderTypeDef tx = {0};
+  CAN_RxHeaderTypeDef rx;
+  uint8_t data[8] = {0};
+  uint8_t request[8] = {1, 3, 0, 0, 0, 0, 0, 0};
+  uint32_t mailbox;
+  uint32_t last_activity;
+  uint8_t responded = 0U;
+
+  *dtc_count = 0U;
+  memset(isotp, 0, sizeof(isotp));
+
+  while (HAL_CAN_GetRxFifoFillLevel(&hcan1, CAN_RX_FIFO0) > 0U)
+  {
+    if (HAL_CAN_GetRxMessage(&hcan1, CAN_RX_FIFO0, &rx, data) != HAL_OK)
+    {
+      break;
+    }
+  }
+
+  tx.StdId = 0x7DF;
+  tx.IDE = CAN_ID_STD;
+  tx.RTR = CAN_RTR_DATA;
+  tx.DLC = 8;
+  tx.TransmitGlobalTime = DISABLE;
+  if (HAL_CAN_AddTxMessage(&hcan1, &tx, request, &mailbox) != HAL_OK)
+  {
+    return 0U;
+  }
+
+  last_activity = HAL_GetTick();
+  while ((uint32_t)(HAL_GetTick() - last_activity) < DTC_TIMEOUT_MS)
+  {
+    uint8_t pci;
+    isotp_rx_t *s;
+
+    if (HAL_CAN_GetRxFifoFillLevel(&hcan1, CAN_RX_FIFO0) == 0U)
+    {
+      continue;
+    }
+    if (HAL_CAN_GetRxMessage(&hcan1, CAN_RX_FIFO0, &rx, data) != HAL_OK)
+    {
+      continue;
+    }
+    if (rx.IDE != CAN_ID_STD || rx.RTR != CAN_RTR_DATA ||
+      rx.StdId < 0x7E8U || rx.StdId > 0x7EFU)
+    {
+      continue;
+    }
+
+    s = &isotp[rx.StdId - 0x7E8U];
+    pci = (uint8_t)(data[0] >> 4);
+
+    if (pci == 0U)  /* single frame: up to 2 DTCs */
+    {
+      const uint8_t len = (uint8_t)(data[0] & 0x0FU);
+
+      if (len >= 2U && len <= 7U && rx.DLC >= (uint32_t)(len + 1U) &&
+        data[1] == 0x43U)
+      {
+        add_dtcs(&data[1], len, dtcs, dtc_count);
+        responded++;
+        last_activity = HAL_GetTick();
+      }
+    }
+    else if (pci == 1U && rx.DLC == 8U && data[2] == 0x43U)  /* first frame */
+    {
+      s->active = 1U;
+      s->total_len = (uint16_t)(((data[0] & 0x0FU) << 8) | data[1]);
+      memcpy(s->buf, &data[2], 6U);
+      s->rx_len = 6U;
+      s->next_sn = 1U;
+      send_flow_control(rx.StdId - 8U);
+      last_activity = HAL_GetTick();
+    }
+    else if (pci == 2U && rx.DLC == 8U && s->active != 0U &&
+         (data[0] & 0x0FU) == s->next_sn)  /* consecutive frame */
+    {
+      for (uint8_t i = 1U; i < 8U && s->rx_len < s->total_len; i++)
+      {
+        if (s->rx_len < sizeof(s->buf))
+        {
+          s->buf[s->rx_len] = data[i];
+        }
+        s->rx_len++;
+      }
+      s->next_sn = (uint8_t)((s->next_sn + 1U) & 0x0FU);
+      last_activity = HAL_GetTick();
+
+      if (s->rx_len >= s->total_len)
+      {
+        add_dtcs(s->buf,
+             (s->total_len < sizeof(s->buf)) ? s->total_len : (uint16_t)sizeof(s->buf),
+             dtcs, dtc_count);
+        responded++;
+        s->active = 0U;
+      }
+    }
+  }
+
+  return responded;
+}
+
+static void emit_dtc_frame(uint32_t uptime_ms,
+               uint8_t responded,
+               const uint16_t dtcs[DTC_MAX],
+               uint8_t dtc_count)
+{
+  char line[320];
+  int written;
+  size_t used;
+
+  written = snprintf(line, sizeof(line),
+             "{\"type\":\"obd_dtc\",\"v\":1,\"uptime_ms\":%lu,"
+             "\"responded\":%u,\"codes\":[",
+             (unsigned long)uptime_ms, (unsigned int)responded);
+  if (written < 0 || (size_t)written >= sizeof(line))
+  {
+    return;
+  }
+  used = (size_t)written;
+
+  for (uint8_t i = 0U; i < dtc_count; i++)
+  {
+    written = snprintf(&line[used], sizeof(line) - used,
+               "%s\"%04X\"", (i == 0U) ? "" : ",",
+               (unsigned int)dtcs[i]);
+    if (written < 0 || (size_t)written >= sizeof(line) - used)
+    {
+      return;
+    }
+    used += (size_t)written;
+  }
+
+  written = snprintf(&line[used], sizeof(line) - used, "]}\n");
+  if (written < 0 || (size_t)written >= sizeof(line) - used)
+  {
+    return;
+  }
+  used += (size_t)written;
+  HAL_UART_Transmit(&huart2, (uint8_t *)line, (uint16_t)used, 200U);
+}
 /* USER CODE END 0 */
 
 /**
@@ -264,6 +466,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
   const uint8_t can_ready = can_start();
   uint32_t seq = 0;
+  uint32_t last_dtc_ms = HAL_GetTick() - DTC_PERIOD_MS;  /* first check runs immediately */
 
   /* USER CODE END 2 */
 
@@ -283,18 +486,31 @@ int main(void)
     /* USER CODE BEGIN 3 */
     uint8_t responses[6][2] = {{0}};
     uint8_t received[6] = {0};
+    const uint32_t cycle_start = HAL_GetTick();
 
     if (can_ready != 0U)
     {
       for (size_t i = 0; i < sizeof(obd_pids); i++)
       {
         received[i] = read_pid(obd_pids[i], obd_pid_data_lengths[i], responses[i]);
-        HAL_Delay(50U);
       }
     }
 
     emit_frame(seq++, HAL_GetTick(), responses, received);
-    HAL_Delay(250U);
+
+    if ((uint32_t)(HAL_GetTick() - last_dtc_ms) >= DTC_PERIOD_MS)
+    {
+      uint16_t dtcs[DTC_MAX];
+      uint8_t dtc_count = 0U;
+      const uint8_t responded = (can_ready != 0U) ? read_dtcs(dtcs, &dtc_count) : 0U;
+
+      last_dtc_ms = HAL_GetTick();
+      emit_dtc_frame(HAL_GetTick(), responded, dtcs, dtc_count);
+    }
+
+    while ((uint32_t)(HAL_GetTick() - cycle_start) < FRAME_MIN_PERIOD_MS)
+    {
+    }
   }
   /* USER CODE END 3 */
 }

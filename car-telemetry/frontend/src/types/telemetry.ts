@@ -38,6 +38,16 @@ export interface Errors {
   seq_gaps: number;
 }
 
+// pending = no DTC check yet; no_response = no ECU answered the last check.
+export type DtcStatus = "pending" | "ok" | "no_response";
+
+export interface DtcInfo {
+  status: DtcStatus;
+  codes: string[]; // e.g. "P0301"
+  age_ms: number | null; // since the last check
+  stale: boolean;
+}
+
 export interface Envelope {
   type: "telemetry_update";
   v: number;
@@ -49,6 +59,7 @@ export interface Envelope {
   source_session: number;
   errors: Errors;
   frame: TelemetryFrame | null;
+  dtc: DtcInfo;
 }
 
 // WebSocket connection state, separate from the STM link state.
@@ -59,6 +70,14 @@ export interface FieldState {
   value: number | null; // canonical units (km/h, degC, rpm, g/s, %, V)
   ageMs: number | null; // effective age, advanced locally between messages
   supported: boolean | null;
+  stale: boolean;
+}
+
+// Trouble-code view model after local aging is applied.
+export interface DtcState {
+  status: DtcStatus;
+  codes: string[];
+  ageMs: number | null;
   stale: boolean;
 }
 

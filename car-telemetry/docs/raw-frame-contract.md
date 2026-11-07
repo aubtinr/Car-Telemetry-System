@@ -44,6 +44,27 @@ A PID absent from every frame so far is treated as "never seen" (value/age null)
 
 Worked example — `"0C":"218C"` → ((0x21·256)+0x8C)/4 = 2147 rpm.
 
+## Trouble codes (`obd_dtc`)
+
+Every ~5 s the STM32 sends a Mode 03 (stored DTCs) request to `0x7DF`, collects
+the answers from every ECU (single- or multi-frame ISO-TP), and emits one extra line:
+
+```json
+{"type":"obd_dtc","v":1,"uptime_ms":208400,"responded":1,"codes":["0301","0420"]}
+```
+
+| Key | Meaning |
+|-----|---------|
+| `type` | literal `"obd_dtc"` |
+| `v` | integer `1` |
+| `uptime_ms` | STM tick count when the check finished |
+| `responded` | number of ECUs that answered. `0` ⇒ nobody answered, so the UI shows "No response", **not** "No codes" |
+| `codes` | each DTC as its two raw bytes in hex (4 chars), de-duplicated across ECUs. Empty with `responded > 0` ⇒ no codes |
+
+The Pi decodes per SAE J2012: top two bits of the first byte pick the system
+(`00`=P, `01`=C, `10`=B, `11`=U), the next two bits are the first digit, and the
+remaining three nibbles follow in hex. `"0301"` → `P0301`, `"C035"` → `U0035`.
+
 ## If the firmware does something different
 - **Sends decoded values already** → bypass `parse_raw_frame`; map fields straight through.
 - **Echoes the mode byte** (e.g. `"410C218C"`) → strip the first two bytes before decode.

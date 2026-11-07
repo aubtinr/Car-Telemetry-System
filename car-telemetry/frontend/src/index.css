@@ -147,6 +147,11 @@ body {
   font-size: 14px;
   font-weight: 600;
 }
+.banner.warn {
+  background: color-mix(in srgb, var(--warn) 18%, var(--panel));
+  border-bottom-color: color-mix(in srgb, var(--warn) 45%, transparent);
+  color: #ffe7b8;
+}
 
 /* ---------- Dashboard ---------- */
 .dash {
@@ -208,7 +213,7 @@ body {
   stroke: var(--accent);
   stroke-width: 14;
   stroke-linecap: round;
-  transition: d 0.12s linear;
+  transition: d 0.06s linear;
 }
 .gauge-number {
   fill: var(--text);
@@ -288,7 +293,7 @@ body {
   height: 100%;
   background: var(--accent);
   border-radius: 999px;
-  transition: width 0.12s linear;
+  transition: width 0.06s linear;
 }
 .tile.stale .tile-bar-fill {
   background: var(--warn);
@@ -304,6 +309,77 @@ body {
 }
 .tile-badge.unsupported,
 .tile-badge.nodata {
+  color: var(--muted);
+}
+
+/* ---------- Trouble codes ---------- */
+.dtc {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dtc.bad {
+  border-color: color-mix(in srgb, var(--bad) 55%, var(--line));
+}
+.dtc-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.dtc-checked {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+.dtc-summary {
+  font-size: 22px;
+  font-weight: 700;
+}
+.dtc.ok .dtc-summary {
+  color: var(--ok);
+}
+.dtc.bad .dtc-summary {
+  color: var(--bad);
+}
+.dtc.nodata .dtc-summary {
+  color: var(--muted);
+}
+.dtc.stale .dtc-summary,
+.dtc.stale .dtc-checked {
+  color: var(--warn);
+}
+.dtc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.dtc-code {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--panel-2);
+  border: 1px solid color-mix(in srgb, var(--bad) 45%, var(--line));
+  border-radius: 10px;
+}
+.dtc-code-id {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}
+.dtc-code-sys {
+  font-size: 12px;
   color: var(--muted);
 }
 

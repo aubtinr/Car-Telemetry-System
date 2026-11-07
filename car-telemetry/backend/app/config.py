@@ -56,6 +56,8 @@ class Config:
     stm_link_timeout_ms: int = _env_int("TELEM_STM_LINK_TIMEOUT_MS", 2000)
     stale_default_ms: int = _env_int("TELEM_STALE_DEFAULT_MS", 2000)
     stale_coolant_ms: int = _env_int("TELEM_STALE_COOLANT_MS", 5000)
+    # Trouble codes are checked every ~5 s; older than this => shown as stale.
+    dtc_stale_ms: int = _env_int("TELEM_DTC_STALE_MS", 15000)
 
     # --- Serial framing guard (handoff: keep each line under 2048 bytes) ---
     max_line_bytes: int = _env_int("TELEM_MAX_LINE_BYTES", 2048)

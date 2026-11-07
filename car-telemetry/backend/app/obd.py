@@ -29,6 +29,14 @@ RAW FRAME SCHEMA (STM32 -> Pi), newline-delimited JSON, one object per line:
 If the firmware instead echoes the mode byte, sends decoded values, uses a
 different key, or packs bytes differently, adjust `parse_raw_frame` and the
 `PIDS` table below -- nothing downstream changes.
+
+TROUBLE CODES (Mode 03), a separate line sent every ~5 s:
+
+  {"type":"obd_dtc","v":1,"uptime_ms":208400,"responded":1,"codes":["0301","0420"]}
+
+  - "responded": how many ECUs answered the request (0 = nobody answered, so
+    "no codes" cannot be claimed).
+  - "codes": each DTC as its two raw bytes in hex; decoded here to "P0301" etc.
 ----------------------------------------------------------------------
 """
 from __future__ import annotations
@@ -37,7 +45,11 @@ from dataclasses import dataclass, field
 from typing import Callable, Optional
 
 RAW_TYPE = "obd_raw"
+DTC_TYPE = "obd_dtc"
 RAW_VERSION = 1
+
+# First two bits of a DTC's high byte pick the system (SAE J2012).
+_DTC_SYSTEMS = "PCBU"
 
 
 @dataclass(frozen=True)
@@ -187,4 +199,40 @@ def parse_raw_frame(obj: dict) -> DecodeResult:
             if spec is not None:
                 result.unsupported.add(spec.field)
 
+    return result
+
+
+@dataclass
+class DtcResult:
+    responded: int = 0              # ECUs that answered the Mode 03 request
+    codes: list[str] = field(default_factory=list)  # decoded, de-duplicated, e.g. "P0301"
+    decode_errors: int = 0
+
+
+def decode_dtc(raw_hex: str) -> str:
+    """Two raw DTC bytes as hex -> SAE J2012 code, e.g. "0301" -> "P0301", "C035" -> "U0035"."""
+    a, b = _hex_to_bytes(raw_hex)  # ValueError unless exactly two bytes
+    return f"{_DTC_SYSTEMS[a >> 6]}{(a >> 4) & 0x3}{a & 0xF:X}{b:02X}"
+
+
+def parse_dtc_frame(obj: dict) -> DtcResult:
+    """Validate and decode one already-JSON-parsed trouble-code line."""
+    if obj.get("v") != RAW_VERSION:
+        raise RawFrameError(f"unsupported dtc schema version {obj.get('v')!r}")
+    responded = obj.get("responded")
+    if not isinstance(responded, int) or responded < 0:
+        raise RawFrameError("'responded' is not a non-negative integer")
+    codes = obj.get("codes", [])
+    if not isinstance(codes, list):
+        raise RawFrameError("'codes' is not a list")
+
+    result = DtcResult(responded=responded)
+    for raw_hex in codes:
+        try:
+            code = decode_dtc(str(raw_hex))
+        except ValueError:
+            result.decode_errors += 1
+            continue
+        if code not in result.codes:
+            result.codes.append(code)
     return result

@@ -20,6 +20,8 @@ React dashboard (Speed + RPM gauges, 4 tiles, unit toggle, 60s trend)
 - **Runs with no hardware.** Mock mode synthesizes *raw* STM frames and pushes them
   through the real decoder + state machine, so the whole stack runs on a laptop.
 - Decode layer for the six PIDs (rpm, speed, coolant, MAF, throttle, O₂ B1S1).
+- Stored trouble codes (Mode 03) checked every 5 s, shown in an always-visible
+  panel ("No codes" / the code list / "No response from ECU") plus an alert banner.
 - Freshness tracking: per-field age, stale flags (2 s default / 5 s coolant), STM
   link fresh/stale/disconnected, sequence-gap and STM-reboot detection, error counters.
 - Robust serial framing: split/combined reads, oversized-line recovery, bad-JSON
@@ -50,7 +52,8 @@ Open **http://localhost:5173**. You'll see a live mock drive.
 
 - Want to see the failure states? Start the backend with
   `TELEM_MOCK_SCENARIO=cycle python3 run.py` — it rotates through normal → stale
-  coolant → unsupported O₂ → unplugged → reconnect every 8 s.
+  coolant → unsupported O₂ → unplugged → reconnect every 8 s (trouble codes
+  appear during stale coolant / unsupported O₂).
 - Want the UI with *no backend at all*? Open **http://localhost:5173/?mock=1**
   (client-side mock; labeled "UI MOCK").
 
@@ -91,6 +94,7 @@ change is `backend/app/obd.py`.
 | `TELEM_PORT` | `8000` | HTTP/WS port |
 | `TELEM_STM_LINK_TIMEOUT_MS` | `2000` | No valid frame for this long → link stale |
 | `TELEM_STALE_DEFAULT_MS` | `2000` | Per-field stale threshold (coolant uses 5000) |
+| `TELEM_DTC_STALE_MS` | `15000` | Trouble-code check older than this → shown as stale |
 
 ## Layout
 

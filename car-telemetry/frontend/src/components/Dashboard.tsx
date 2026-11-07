@@ -1,5 +1,6 @@
 // Top-level layout: status bar, two large gauges (Speed + RPM), four tiles,
-// and the 60 s trend. Holds the two bits of view state: unit system + trend metric.
+// trouble codes, and the 60 s trend. Holds the two bits of view state: unit
+// system + trend metric.
 
 import { useState } from "react";
 import { useTelemetry } from "../transport/useTelemetry";
@@ -7,6 +8,7 @@ import { StatusBar } from "./StatusBar";
 import { Gauge } from "./Gauge";
 import { MetricTile } from "./MetricTile";
 import { TrendChart } from "./TrendChart";
+import { DtcPanel } from "./DtcPanel";
 import { fieldLabel, type UnitSystem } from "../lib/units";
 import type { FieldName } from "../types/telemetry";
 
@@ -18,6 +20,7 @@ export function Dashboard() {
   const [trendField, setTrendField] = useState<FieldName>("speed_kmh");
 
   const disconnected = t.link === "disconnected";
+  const codes = t.dtc.status === "ok" ? t.dtc.codes : [];
 
   return (
     <div className="app">
@@ -27,6 +30,13 @@ export function Dashboard() {
         <div className="banner">
           No live vehicle data — {t.wsStatus !== "open" ? "backend/WebSocket unreachable" : "STM link down"}.
           Readings below are not current.
+        </div>
+      )}
+
+      {codes.length > 0 && (
+        <div className="banner warn">
+          Check engine — {codes.length} trouble code{codes.length === 1 ? "" : "s"}:{" "}
+          {codes.join(", ")}
         </div>
       )}
 
@@ -47,6 +57,8 @@ export function Dashboard() {
             <MetricTile key={f} field={f} state={t.fields[f]} system={system} />
           ))}
         </section>
+
+        <DtcPanel dtc={t.dtc} />
 
         <TrendChart field={trendField} system={system} onFieldChange={setTrendField} />
       </main>

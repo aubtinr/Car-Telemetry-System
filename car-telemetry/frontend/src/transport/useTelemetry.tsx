@@ -17,6 +17,7 @@ import {
 } from "react";
 import {
   FIELD_NAMES,
+  type DtcState,
   type Envelope,
   type Errors,
   type FieldName,
@@ -32,6 +33,7 @@ const HISTORY_MS = 60_000;
 const LINK_TIMEOUT_MS = 2000;
 const STALE_COOLANT_MS = 5000;
 const STALE_DEFAULT_MS = 2000;
+const DTC_STALE_MS = 15_000;
 const BACKOFF_MS = [1000, 2000, 4000, 5000];
 
 function staleThreshold(field: FieldName): number {
@@ -51,6 +53,7 @@ export interface TelemetryView {
   seq: number | null;
   fields: Record<FieldName, FieldState>;
   history: Record<FieldName, HistoryPoint[]>;
+  dtc: DtcState;
 }
 
 const emptyFields = (): Record<FieldName, FieldState> => {
@@ -96,6 +99,8 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
         }
       }
     }
+    // Re-render now rather than waiting for the next aging tick.
+    setTick((n) => (n + 1) % 1_000_000);
   };
 
   // ---- transport: client mock ----------------------------------------------
@@ -162,7 +167,7 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [useMock]);
 
-  // ---- local aging clock: re-render ~8 Hz so ages/staleness advance ---------
+  // ---- local aging clock: also re-render ~8 Hz between messages -------------
   useEffect(() => {
     const id = window.setInterval(() => setTick((n) => (n + 1) % 1_000_000), 125);
     return () => window.clearInterval(id);
@@ -182,6 +187,7 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
     let sourceSession = 0;
     let lastFrameAgeMs: number | null = null;
     let seq: number | null = null;
+    let dtc: DtcState = { status: "pending", codes: [], ageMs: null, stale: false };
 
     if (env) {
       mode = env.mode;
@@ -202,6 +208,16 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
         link = "stale";
       } else {
         link = "fresh";
+      }
+
+      if (env.dtc) {
+        const ageMs = env.dtc.age_ms === null ? null : Math.round(env.dtc.age_ms + sinceArrival);
+        dtc = {
+          status: env.dtc.status,
+          codes: env.dtc.codes,
+          ageMs,
+          stale: link === "disconnected" || (ageMs !== null && ageMs > DTC_STALE_MS),
+        };
       }
 
       if (env.frame) {
@@ -236,9 +252,10 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
       seq,
       fields,
       history: historyRef.current,
+      dtc,
     };
-    // Recomputed each render; `tick` (bumped ~8 Hz) drives the re-renders so
-    // ages and staleness advance even while no new envelope arrives.
+    // Recomputed each render; `tick` is bumped on every envelope and ~8 Hz in
+    // between, so ages and staleness advance even while no new envelope arrives.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wsStatus, useMock, tick]);
 

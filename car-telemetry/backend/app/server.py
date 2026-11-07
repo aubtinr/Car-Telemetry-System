@@ -4,11 +4,13 @@ Endpoints (handoff section 5):
   GET  /              -> the built React app (when backend/static exists)
   GET  /api/health    -> mode, serial connection, last frame age, error counters
   GET  /api/latest    -> most recent telemetry envelope (for initial page load)
-  WS   /ws/telemetry  -> latest envelope on connect, each new snapshot, and a
-                         status refresh at least once per second
+  WS   /ws/telemetry  -> latest envelope on connect, each new snapshot (pushed as
+                         soon as it arrives), and a status refresh at least once
+                         per second
 
-Only the latest snapshot is ever kept pending (no unbounded queue): a slow client
-simply misses intermediate frames, it does not build backpressure.
+Only the latest snapshot is ever kept pending (no unbounded queue): frames that
+arrive while a send is in progress collapse into one, so a slow client misses
+intermediate frames instead of building backpressure.
 """
 from __future__ import annotations
 
@@ -33,13 +35,14 @@ class Hub:
         self.engine = TelemetryEngine()
         self.source = None
         self.clients: set[WebSocket] = set()
-        self._frame_counter = 0  # bumped (from the source thread) on each new frame
         self._loop: asyncio.AbstractEventLoop | None = None
+        self._wake: asyncio.Event | None = None  # set on each new frame
         self._task: asyncio.Task | None = None
 
     def on_frame(self) -> None:
-        # Called from the serial/mock thread. Int increment is atomic under the GIL.
-        self._frame_counter += 1
+        # Called from the serial/mock thread: wake the broadcaster right away.
+        if self._loop is not None and self._wake is not None:
+            self._loop.call_soon_threadsafe(self._wake.set)
 
     def start_source(self) -> None:
         if config.mock:
@@ -54,23 +57,16 @@ class Hub:
         return self.engine.build_envelope(mode, connected)
 
     async def broadcast_loop(self) -> None:
-        last_sent = 0.0
-        last_counter = -1
+        # Send as soon as a frame arrives, or after heartbeat_s of silence.
+        assert self._wake is not None
         while True:
-            await asyncio.sleep(0.05)
-            now = asyncio.get_event_loop().time()
-            new_frame = self._frame_counter != last_counter
-            heartbeat_due = (now - last_sent) >= config.heartbeat_s
-            if not (new_frame or heartbeat_due):
-                continue
-            if not self.clients:
-                last_counter = self._frame_counter
-                last_sent = now
-                continue
-            env = self.latest_envelope()
-            await self._send_all(env)
-            last_counter = self._frame_counter
-            last_sent = now
+            try:
+                await asyncio.wait_for(self._wake.wait(), timeout=config.heartbeat_s)
+            except asyncio.TimeoutError:
+                pass
+            self._wake.clear()
+            if self.clients:
+                await self._send_all(self.latest_envelope())
 
     async def _send_all(self, env: dict) -> None:
         dead = []
@@ -89,6 +85,7 @@ hub = Hub()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     hub._loop = asyncio.get_event_loop()
+    hub._wake = asyncio.Event()
     hub.start_source()
     hub._task = asyncio.create_task(hub.broadcast_loop())
     try:

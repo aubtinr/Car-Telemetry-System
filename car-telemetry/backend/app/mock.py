@@ -8,9 +8,12 @@ Scenarios (TELEM_MOCK_SCENARIO):
   drive  -- a calm, plausible healthy drive. Good for a first look / demo.
   cycle  -- rotates through the required test states so each can be seen:
             normal -> stale-coolant -> unsupported-O2 -> unplug -> reconnect -> ...
+            Trouble codes P0301 + P0420 are reported during stale-coolant and
+            unsupported-O2; during reconnect the ECU "doesn't answer" the DTC request.
 """
 from __future__ import annotations
 
+import json
 import math
 import random
 import threading
@@ -20,7 +23,8 @@ from typing import Callable
 from .config import config
 from .state import TelemetryEngine
 
-PERIOD_S = 0.2  # 5 Hz, matching the real snapshot cadence
+PERIOD_S = 0.1  # 10 Hz; real hardware runs roughly 10-20 Hz
+DTC_PERIOD_S = 5.0  # matches the firmware's Mode 03 check
 
 
 def _hex(*vals: int) -> str:
@@ -36,6 +40,7 @@ class MockSource:
         self._seq = 0
         self._t0 = time.monotonic()
         self._boot = time.monotonic()
+        self._last_dtc: float | None = None
 
     @property
     def connected(self) -> bool:
@@ -135,11 +140,34 @@ class MockSource:
             }
             if unsupported:
                 obj["unsupported"] = [self._pid_for(f) for f in unsupported]
+            self._emit(obj)
 
-            import json
-            line = json.dumps(obj, separators=(",", ":"))
-            if self.engine.ingest_line(line):
-                self._on_frame()
+            if self._last_dtc is None or now - self._last_dtc >= DTC_PERIOD_S:
+                self._last_dtc = now
+                self._emit(self._dtc_line(elapsed, uptime_ms))
+
+    def _emit(self, obj: dict) -> None:
+        line = json.dumps(obj, separators=(",", ":"))
+        if self.engine.ingest_line(line):
+            self._on_frame()
+
+    @staticmethod
+    def _dtc_line(elapsed: float, uptime_ms: int) -> dict:
+        codes: list[str] = []
+        responded = 1
+        if config.mock_scenario == "cycle":
+            phase = int(elapsed // 8) % 5
+            if phase in (1, 2):
+                codes = ["0301", "0420"]  # raw bytes for P0301 (misfire), P0420 (catalyst)
+            elif phase == 4:
+                responded = 0
+        return {
+            "type": "obd_dtc",
+            "v": 1,
+            "uptime_ms": uptime_ms,
+            "responded": responded,
+            "codes": codes,
+        }
 
     @staticmethod
     def _pid_for(field: str) -> str:
