@@ -61,25 +61,17 @@ No parity
 1 stop bit
 ```
 
-This lets the code print telemetry through the Nucleo's virtual COM port.
+This carries the newline-delimited JSON telemetry stream through the Nucleo's virtual COM port. Do not print debug text on this UART when it is connected to the Pi.
 
 ## 5. Generate code
 
 Let CubeMX generate the initialization code.
 
-Then add:
-
-```text
-Core/Inc/obd2.h
-Core/Src/obd2.c
-```
-
-The starter `main.c` shows the application logic. The safest workflow is:
-
-1. Keep your CubeMX-generated `main.c`.
-2. Add `#include "obd2.h"`.
-3. Copy the application logic into the generated file's USER CODE sections.
-4. Keep CubeMX's real `SystemClock_Config()` and `Error_Handler()`.
+The root `main.c` emits the raw JSON frames expected by the Pi. The helper files
+`Core/Inc/obd2.h` and `Core/Src/obd2.c`, and `examples/main_example.c`, are for the
+human-readable debugging example and are not used by the Pi telemetry path.
+Preserve the clock and peripheral configuration generated for your board when
+adapting the root `main.c`.
 
 ## 6. Serial terminal
 
@@ -90,14 +82,10 @@ Connect the Nucleo over USB and open the ST-LINK virtual COM port with:
 8-N-1
 ```
 
-Expected output after the simulator responds:
+Expected output after the simulator responds (one JSON object per line):
 
-```text
-CAN started successfully.
-ECU 0x7E8 | RPM: 2500.0
-ECU 0x7E8 | Speed: 40 km/h
-ECU 0x7E8 | Coolant: 90 C
-----------------------------------------
+```json
+{"type":"obd_raw","v":1,"seq":1,"uptime_ms":1000,"pids":{"0C":"2710","0D":"28","05":"82","10":"0280","11":"38","14":"6F80"},"no_response":[]}
 ```
 
 ## 7. If you get only timeouts

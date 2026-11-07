@@ -62,149 +62,171 @@ static void MX_USART2_UART_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-static void print_text(const char *s)
+static const uint8_t obd_pids[] = {0x0C, 0x0D, 0x05, 0x10, 0x11, 0x14};
+static const uint8_t obd_pid_data_lengths[] = {2, 1, 1, 2, 1, 2};
+
+static uint8_t can_start(void)
 {
-    HAL_UART_Transmit(&huart2, (uint8_t *)s,
-                      (uint16_t)strlen(s), 200);
+  CAN_FilterTypeDef filter = {0};
+
+  filter.FilterBank = 0;
+  filter.FilterMode = CAN_FILTERMODE_IDMASK;
+  filter.FilterScale = CAN_FILTERSCALE_32BIT;
+  filter.FilterFIFOAssignment = CAN_RX_FIFO0;
+  filter.FilterActivation = ENABLE;
+  filter.SlaveStartFilterBank = 14;
+
+  if (HAL_CAN_ConfigFilter(&hcan1, &filter) != HAL_OK)
+  {
+    return 0;
+  }
+
+  return HAL_CAN_Start(&hcan1) == HAL_OK;
 }
 
-static void can_start(void)
+static uint8_t read_pid(uint8_t pid, uint8_t data_length, uint8_t raw_data[2])
 {
-    CAN_FilterTypeDef filter = {0};
-    char msg[100];
+  CAN_TxHeaderTypeDef tx = {0};
+  CAN_RxHeaderTypeDef rx;
+  uint8_t data[8] = {0};
+  uint8_t request[8] = {2, 1, pid, 0, 0, 0, 0, 0};
+  uint32_t mailbox;
+  uint32_t start;
 
-    filter.FilterBank = 0;
-    filter.FilterMode = CAN_FILTERMODE_IDMASK;
-    filter.FilterScale = CAN_FILTERSCALE_32BIT;
-    filter.FilterFIFOAssignment = CAN_RX_FIFO0;
-    filter.FilterActivation = ENABLE;
-    filter.SlaveStartFilterBank = 14;
-
-    print_text("Configuring CAN filter...\r\n");
-
-    if (HAL_CAN_ConfigFilter(&hcan1, &filter) != HAL_OK)
+  while (HAL_CAN_GetRxFifoFillLevel(&hcan1, CAN_RX_FIFO0) > 0U)
+  {
+    if (HAL_CAN_GetRxMessage(&hcan1, CAN_RX_FIFO0, &rx, data) != HAL_OK)
     {
-        print_text("CAN filter configuration FAILED\r\n");
-        return;
+      break;
+    }
+  }
+
+  tx.StdId = 0x7DF;
+  tx.IDE = CAN_ID_STD;
+  tx.RTR = CAN_RTR_DATA;
+  tx.DLC = 8;
+  tx.TransmitGlobalTime = DISABLE;
+  if (HAL_CAN_AddTxMessage(&hcan1, &tx, request, &mailbox) != HAL_OK)
+  {
+    return 0;
+  }
+
+  start = HAL_GetTick();
+  while ((uint32_t)(HAL_GetTick() - start) < 150U)
+  {
+    if (HAL_CAN_GetRxFifoFillLevel(&hcan1, CAN_RX_FIFO0) == 0U)
+    {
+      continue;
+    }
+    if (HAL_CAN_GetRxMessage(&hcan1, CAN_RX_FIFO0, &rx, data) != HAL_OK)
+    {
+      continue;
+    }
+    if (rx.IDE != CAN_ID_STD || rx.RTR != CAN_RTR_DATA ||
+      rx.StdId < 0x7E8U || rx.StdId > 0x7EFU ||
+      rx.DLC < (uint32_t)(data_length + 3U))
+    {
+      continue;
+    }
+    if (data[0] != (uint8_t)(data_length + 2U) ||
+      data[1] != 0x41U || data[2] != pid)
+    {
+      continue;
     }
 
-    print_text("CAN filter configured!\r\n");
+    memcpy(raw_data, &data[3], data_length);
+    return 1;
+  }
 
-    // NEW: Check state immediately before starting CAN
-    snprintf(msg, sizeof(msg),
-             "CAN state before start: %d\r\n",
-             (int)HAL_CAN_GetState(&hcan1));
-    print_text(msg);
-
-    print_text("Starting CAN peripheral...\r\n");
-
-    HAL_StatusTypeDef status = HAL_CAN_Start(&hcan1);
-
-    snprintf(msg, sizeof(msg),
-             "CAN start status=%d, state=%d, error=0x%08lX\r\n",
-             (int)status,
-             (int)HAL_CAN_GetState(&hcan1),
-             (unsigned long)HAL_CAN_GetError(&hcan1));
-    print_text(msg);
+  HAL_CAN_AbortTxRequest(&hcan1, mailbox);
+  return 0;
 }
 
-static void read_pid(uint8_t pid)
+static void emit_frame(uint32_t seq,
+             uint32_t uptime_ms,
+             const uint8_t responses[6][2],
+             const uint8_t received[6])
 {
-    CAN_TxHeaderTypeDef tx = {0};
-    CAN_RxHeaderTypeDef rx;
-    uint8_t data[8];
-    uint8_t request[8] = {2, 1, pid, 0, 0, 0, 0, 0};
-    uint32_t mailbox;
-    char line[128];
+  char line[256];
+  int written;
+  size_t used;
+  uint8_t first;
 
-    /* Discard stale frames before making this request. */
-    while (HAL_CAN_GetRxFifoFillLevel(&hcan1, CAN_RX_FIFO0)) {
-        if (HAL_CAN_GetRxMessage(&hcan1, CAN_RX_FIFO0, &rx, data)
-            != HAL_OK) break;
+  written = snprintf(line, sizeof(line),
+             "{\"type\":\"obd_raw\",\"v\":1,\"seq\":%lu,"
+             "\"uptime_ms\":%lu,\"pids\":{",
+             (unsigned long)seq, (unsigned long)uptime_ms);
+  if (written < 0 || (size_t)written >= sizeof(line))
+  {
+    return;
+  }
+  used = (size_t)written;
+  first = 1U;
+
+  for (size_t i = 0; i < sizeof(obd_pids); i++)
+  {
+    if (received[i] == 0U)
+    {
+      continue;
     }
-    tx.StdId = 0x7DF;             /* Functional OBD request ID */
-    tx.IDE = CAN_ID_STD;
-    tx.RTR = CAN_RTR_DATA;
-    tx.DLC = 8;
-    tx.TransmitGlobalTime = DISABLE;
-    if (HAL_CAN_AddTxMessage(&hcan1, &tx, request, &mailbox) != HAL_OK) {
-        print_text("Unable to queue CAN request\r\n");
-        return;
+
+    if (obd_pid_data_lengths[i] == 1U)
+    {
+      written = snprintf(&line[used], sizeof(line) - used,
+                 "%s\"%02X\":\"%02X\"",
+                 first ? "" : ",",
+                 (unsigned int)obd_pids[i],
+                 (unsigned int)responses[i][0]);
     }
-
-    uint32_t start = HAL_GetTick();
-    while ((uint32_t)(HAL_GetTick() - start) < 300) {
-        if (!HAL_CAN_GetRxFifoFillLevel(&hcan1, CAN_RX_FIFO0)) continue;
-        if (HAL_CAN_GetRxMessage(&hcan1, CAN_RX_FIFO0, &rx, data)
-            != HAL_OK) continue;
-        if (rx.IDE != CAN_ID_STD || rx.RTR != CAN_RTR_DATA ||
-            rx.StdId < 0x7E8 || rx.StdId > 0x7EF || rx.DLC < 4)
-            continue;
-        /* 0x41 = positive reply to Mode 01 (current sensor data). */
-        if (data[1] != 0x41 || data[2] != pid) continue;
-
-        uint8_t A = data[3];
-        uint8_t B = (rx.DLC >= 5) ? data[4] : 0;
-
-        switch (pid) {
-            case 0x0C: { // Engine RPM
-                if (data[0] != 4 || rx.DLC < 5) break;
-                float rpm = ((A * 256.0f) + B) / 4.0f;
-                snprintf(line, sizeof(line), "RPM: %.0f\r\n", rpm);
-                print_text(line);
-                return;
-            }
-
-            case 0x05: { // Coolant temperature
-                if (data[0] != 3) break;
-                int temp = (int)A - 40;
-                snprintf(line, sizeof(line), "Coolant: %d C\r\n", temp);
-                print_text(line);
-                return;
-            }
-
-            case 0x0D: { // Vehicle speed
-                if (data[0] != 3) break;
-                snprintf(line, sizeof(line), "Speed: %u km/h\r\n", A);
-                print_text(line);
-                return;
-            }
-
-            case 0x10: { // Mass airflow
-                if (data[0] != 4 || rx.DLC < 5) break;
-                float maf = ((A * 256.0f) + B) / 100.0f;
-                snprintf(line, sizeof(line), "MAF: %.2f g/s\r\n", maf);
-                print_text(line);
-                return;
-            }
-
-            case 0x11: { // Throttle position
-                if (data[0] != 3) break;
-                float throttle = (A * 100.0f) / 255.0f;
-                snprintf(line, sizeof(line), "Throttle: %.1f%%\r\n", throttle);
-                print_text(line);
-                return;
-            }
-
-            case 0x14: { // O2 Sensor 1 voltage
-                if (data[0] != 4 || rx.DLC < 5) break;
-
-                // Voltage = A / 200 volts
-                uint32_t millivolts = (uint32_t)A * 5;
-
-                snprintf(line, sizeof(line),
-                         "O2 Voltage: %lu.%03lu V\r\n",
-                         (unsigned long)(millivolts / 1000),
-                         (unsigned long)(millivolts % 1000));
-
-                print_text(line);
-                return;
-            }
-        }
-
+    else
+    {
+      written = snprintf(&line[used], sizeof(line) - used,
+                 "%s\"%02X\":\"%02X%02X\"",
+                 first ? "" : ",",
+                 (unsigned int)obd_pids[i],
+                 (unsigned int)responses[i][0],
+                 (unsigned int)responses[i][1]);
     }
-    HAL_CAN_AbortTxRequest(&hcan1, mailbox);
+    if (written < 0 || (size_t)written >= sizeof(line) - used)
+    {
+      return;
+    }
+    used += (size_t)written;
+    first = 0U;
+  }
 
+  written = snprintf(&line[used], sizeof(line) - used, "},\"no_response\":[");
+  if (written < 0 || (size_t)written >= sizeof(line) - used)
+  {
+    return;
+  }
+  used += (size_t)written;
+  first = 1U;
+
+  for (size_t i = 0; i < sizeof(obd_pids); i++)
+  {
+    if (received[i] != 0U)
+    {
+      continue;
+    }
+    written = snprintf(&line[used], sizeof(line) - used,
+               "%s\"%02X\"", first ? "" : ",",
+               (unsigned int)obd_pids[i]);
+    if (written < 0 || (size_t)written >= sizeof(line) - used)
+    {
+      return;
+    }
+    used += (size_t)written;
+    first = 0U;
+  }
+
+  written = snprintf(&line[used], sizeof(line) - used, "]}\n");
+  if (written < 0 || (size_t)written >= sizeof(line) - used)
+  {
+    return;
+  }
+  used += (size_t)written;
+  HAL_UART_Transmit(&huart2, (uint8_t *)line, (uint16_t)used, 200U);
 }
 /* USER CODE END 0 */
 
@@ -240,18 +262,8 @@ int main(void)
   MX_CAN1_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-
-  print_text("Checking CAN state...\r\n");
-
-  char msg[100];
-  snprintf(msg, sizeof(msg),
-           "CAN state: %d\r\n",
-           (int)HAL_CAN_GetState(&hcan1));
-  print_text(msg);
-
-  print_text("\r\nOBD simulator test: CAN1 500 kbps\r\n");
-  print_text("Starting CAN...\r\n");
-  can_start();
+  const uint8_t can_ready = can_start();
+  uint32_t seq = 0;
 
   /* USER CODE END 2 */
 
@@ -269,23 +281,20 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  read_pid(0x0C);   // Engine RPM
-	  HAL_Delay(100);
+    uint8_t responses[6][2] = {{0}};
+    uint8_t received[6] = {0};
 
-	  read_pid(0x05);   // Coolant temperature
-	  HAL_Delay(100);
+    if (can_ready != 0U)
+    {
+      for (size_t i = 0; i < sizeof(obd_pids); i++)
+      {
+        received[i] = read_pid(obd_pids[i], obd_pid_data_lengths[i], responses[i]);
+        HAL_Delay(50U);
+      }
+    }
 
-	  read_pid(0x0D);   // Vehicle speed
-	  HAL_Delay(100);
-
-	  read_pid(0x10);   // MAF
-	  HAL_Delay(100);
-
-	  read_pid(0x11);   // Throttle position
-	  HAL_Delay(100);
-
-	  read_pid(0x14);  // O2 Sensor 1 voltage
-	  HAL_Delay(100);
+    emit_frame(seq++, HAL_GetTick(), responses, received);
+    HAL_Delay(250U);
   }
   /* USER CODE END 3 */
 }
