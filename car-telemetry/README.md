@@ -122,6 +122,6 @@ scripts/   build_frontend.sh
 
 ## Deferred to later (by design)
 
-Final theme/colors/gauge styling, CSV logging, DTCs, Pi auto-start wiring beyond the
-sample unit in `deploy/`, and car-power integration. The current look is a clean,
+Final gauge styling, CSV export, and car-power integration. (Start-on-boot is set
+up by `deploy/install_autostart.sh`; see `deploy/kiosk.md`.) The current look is a clean,
 functional placeholder.

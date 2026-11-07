@@ -1,24 +1,32 @@
-# Chromium kiosk on the Pi (notes)
+# Start on boot (Pi kiosk)
 
-After the backend runs as a service (see `car-telemetry.service`) and the desktop
-session is up, launch Chromium full-screen pointing at the local backend.
+One command, after the backend venv is set up and the UI is built:
 
-Autostart entry (`~/.config/autostart/telemetry-kiosk.desktop`):
-
-```ini
-[Desktop Entry]
-Type=Application
-Name=Telemetry Kiosk
-Exec=bash -lc 'sleep 5; chromium-browser --kiosk --noerrdialogs --disable-infobars \
-  --incognito --check-for-update-interval=31536000 http://127.0.0.1:8000'
-X-GNOME-Autostart-enabled=true
+```bash
+bash deploy/install_autostart.sh            # or pass the serial port explicitly
 ```
 
+It installs the backend as a systemd service (`car-telemetry`), turns on desktop
+auto-login, disables screen blanking, and adds
+`~/.config/autostart/telemetry-kiosk.desktop`, which runs `deploy/kiosk.sh`:
+that waits for the backend, then opens Chromium full-screen on the dashboard.
+
+Day to day:
+- Exit the kiosk: **Alt+F4**. Reopen: `bash deploy/kiosk.sh`.
+- Backend logs: `journalctl -u car-telemetry -f`; restart: `sudo systemctl restart car-telemetry`.
+- After `git pull` + `bash scripts/build_frontend.sh`, restart the service and the
+  kiosk (or just reboot).
+- Turn it off: `sudo systemctl disable --now car-telemetry` and delete
+  `~/.config/autostart/telemetry-kiosk.desktop`.
+
 Notes:
-- Use `chromium` instead of `chromium-browser` if that's the binary name on your OS.
-- The `sleep 5` gives the backend time to bind the port after boot; raise if needed,
-  or gate on the service with a proper systemd user unit.
+- Chromium runs without `--incognito` on purpose: the dashboard keeps its
+  theme/layout/units in browser storage, which incognito wipes on every launch.
+- The autostart entry works with the X11 and labwc desktops. On an older
+  Bookworm install using **wayfire**, add instead to `~/.config/wayfire.ini`:
+  ```ini
+  [autostart]
+  telemetry_kiosk = bash /home/<you>/Car-Telemetry-System/car-telemetry/deploy/kiosk.sh
+  ```
 - Verify touch orientation matches screen rotation; calibrate if a swap is needed.
-- Read the panel's **actual** resolution and OS scaling before trusting any layout —
-  don't assume 1024×600 or 1280×800 from the 10" diagonal (handoff section 6).
 - Local operation needs no Wi-Fi.

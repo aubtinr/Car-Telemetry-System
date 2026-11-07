@@ -1,8 +1,6 @@
 # systemd unit for the backend (serves the built UI + API + WebSocket).
-# Install on the Pi:
-#   sudo cp deploy/car-telemetry.service /etc/systemd/system/
-#   sudo systemctl daemon-reload && sudo systemctl enable --now car-telemetry
-# Edit User/paths/port to match your Pi. Build the frontend first so backend/static exists.
+# Template: deploy/install_autostart.sh fills in __USER__, __DIR__ and __PORT__
+# and installs it to /etc/systemd/system/. Re-run that script after moving the repo.
 
 [Unit]
 Description=Car Telemetry backend (STM32 -> Pi -> React)
@@ -10,12 +8,12 @@ After=network.target
 
 [Service]
 Type=simple
-User=pi
-WorkingDirectory=/home/pi/car-telemetry/backend
+User=__USER__
+WorkingDirectory=__DIR__/backend
 Environment=TELEM_MOCK=0
-Environment=TELEM_SERIAL_PORT=/dev/ttyACM0
+Environment=TELEM_SERIAL_PORT=__PORT__
 Environment=TELEM_PORT=8000
-ExecStart=/usr/bin/python3 run.py
+ExecStart=__DIR__/backend/.venv/bin/python run.py
 Restart=always
 RestartSec=2
 
