@@ -15,6 +15,7 @@ backend/static/
 
 # Logs / data
 logs/
+backend/data/
 *.csv
 
 # OS / editor

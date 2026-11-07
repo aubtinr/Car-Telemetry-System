@@ -65,6 +65,12 @@ class Config:
     # --- Status heartbeat: push a status refresh at least this often (seconds) ---
     heartbeat_s: float = float(_env_int("TELEM_HEARTBEAT_MS", 1000)) / 1000.0
 
+    # SQLite file holding recorded laps. Created on first run.
+    lap_db_path: str = os.environ.get(
+        "TELEM_LAP_DB",
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "laps.sqlite3"),
+    )
+
     # Directory holding the built React app (served at "/"). Optional.
     static_dir: str = os.environ.get(
         "TELEM_STATIC_DIR",

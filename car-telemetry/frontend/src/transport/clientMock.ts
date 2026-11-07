@@ -77,6 +77,8 @@ export function startClientMock(onEnvelope: (env: Envelope) => void): () => void
         age_ms: 0,
         stale: false,
       },
+      // Laps are recorded by the backend; the UI-only mock can't record them.
+      lap: { active: false, id: null, started_at: null, elapsed_ms: null, distance_km: null },
     };
     onEnvelope(env);
   };

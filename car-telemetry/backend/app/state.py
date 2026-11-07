@@ -17,7 +17,7 @@ import json
 import threading
 import time
 from datetime import datetime, timezone
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from .config import config
 from .obd import (
@@ -29,6 +29,9 @@ from .obd import (
     parse_dtc_frame,
     parse_raw_frame,
 )
+
+if TYPE_CHECKING:
+    from .laps import LapRecorder
 
 FRAME_VERSION = 1
 UINT32 = 1 << 32
@@ -63,6 +66,9 @@ class TelemetryEngine:
         self._dtc_responded = False
         self._dtc_checked_mono: Optional[float] = None
 
+        # Receives every decoded frame + DTC list while a lap is recording.
+        self.recorder: Optional["LapRecorder"] = None
+
         # Diagnostics / error counters
         self.err_parse = 0        # bad JSON or structural RawFrameError
         self.err_oversize = 0     # lines over the byte cap (counted by the reader)
@@ -88,9 +94,15 @@ class TelemetryEngine:
             return False
         try:
             if isinstance(obj, dict) and obj.get("type") == DTC_TYPE:
-                self._apply_dtc(parse_dtc_frame(obj))
+                dtc = parse_dtc_frame(obj)
+                self._apply_dtc(dtc)
+                if self.recorder is not None:
+                    self.recorder.add_codes(dtc.codes)
             else:
-                self._apply(parse_raw_frame(obj))
+                result = parse_raw_frame(obj)
+                self._apply(result)
+                if self.recorder is not None:
+                    self.recorder.add_sample(result.values)
         except RawFrameError:
             with self._lock:
                 self.err_parse += 1

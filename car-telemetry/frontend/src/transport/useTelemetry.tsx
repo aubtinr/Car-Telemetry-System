@@ -23,6 +23,7 @@ import {
   type FieldName,
   type FieldState,
   type HistoryPoint,
+  type LapState,
   type Mode,
   type StmLink,
   type WsStatus,
@@ -54,6 +55,7 @@ export interface TelemetryView {
   fields: Record<FieldName, FieldState>;
   history: Record<FieldName, HistoryPoint[]>;
   dtc: DtcState;
+  lap: LapState;
 }
 
 const emptyFields = (): Record<FieldName, FieldState> => {
@@ -188,6 +190,7 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
     let lastFrameAgeMs: number | null = null;
     let seq: number | null = null;
     let dtc: DtcState = { status: "pending", codes: [], ageMs: null, stale: false };
+    let lap: LapState = { active: false, id: null, elapsedMs: null, distanceKm: null };
 
     if (env) {
       mode = env.mode;
@@ -217,6 +220,16 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
           codes: env.dtc.codes,
           ageMs,
           stale: link === "disconnected" || (ageMs !== null && ageMs > DTC_STALE_MS),
+        };
+      }
+
+      if (env.lap?.active) {
+        lap = {
+          active: true,
+          id: env.lap.id,
+          elapsedMs:
+            env.lap.elapsed_ms === null ? null : Math.round(env.lap.elapsed_ms + sinceArrival),
+          distanceKm: env.lap.distance_km,
         };
       }
 
@@ -253,6 +266,7 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
       fields,
       history: historyRef.current,
       dtc,
+      lap,
     };
     // Recomputed each render; `tick` is bumped on every envelope and ~8 Hz in
     // between, so ages and staleness advance even while no new envelope arrives.

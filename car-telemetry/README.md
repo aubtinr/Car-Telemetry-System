@@ -26,9 +26,16 @@ React dashboard (Speed + RPM gauges, 4 tiles, unit toggle, 60s trend)
   link fresh/stale/disconnected, sequence-gap and STM-reboot detection, error counters.
 - Robust serial framing: split/combined reads, oversized-line recovery, bad-JSON
   recovery, auto-reconnect on unplug (~1 Hz).
-- UI: large Speed + RPM gauges, coolant/throttle/MAF/O₂ tiles, metric⇄imperial
-  toggle, a selectable 60 s trend line, explicit connection indicators, and a visible
-  MOCK badge that never silently replaces live data.
+- UI: large Speed + RPM gauges, coolant/throttle/MAF/O₂ tiles, a selectable 60 s
+  trend line, explicit connection indicators, and a visible MOCK badge that never
+  silently replaces live data.
+- Lap recording: **Start lap / Stop lap** in the top bar. Every frame in between is
+  saved to SQLite on the Pi (`backend/data/laps.sqlite3`) with a summary (duration,
+  distance, per-metric min/avg/max, trouble codes seen). Saved laps are under
+  **Menu → Saved laps**, each with a full-lap chart. A lap cut off by a crash or
+  power loss is closed and marked "recovered" on the next start (≤ ~1 s lost).
+- Menu: layout (Auto / Landscape / Portrait), color theme (Midnight, Daylight,
+  Ember, Track, Night), and units, remembered per browser.
 
 ## Quick start (laptop, no hardware)
 
@@ -95,6 +102,7 @@ change is `backend/app/obd.py`.
 | `TELEM_STM_LINK_TIMEOUT_MS` | `2000` | No valid frame for this long → link stale |
 | `TELEM_STALE_DEFAULT_MS` | `2000` | Per-field stale threshold (coolant uses 5000) |
 | `TELEM_DTC_STALE_MS` | `15000` | Trouble-code check older than this → shown as stale |
+| `TELEM_LAP_DB` | `backend/data/laps.sqlite3` | Where recorded laps are stored |
 
 ## Layout
 
@@ -102,6 +110,7 @@ change is `backend/app/obd.py`.
 backend/   FastAPI + serial reader + OBD decode + state machine (+ mock)
   app/obd.py       ← the raw→units translation (revisit with firmware author)
   app/state.py     ← freshness, support, seq/reboot tracking, envelope assembly
+  app/laps.py      ← lap recording + summaries (SQLite)
   app/serial_reader.py / mock.py / server.py / config.py
 frontend/  React + TypeScript + Vite
   src/transport/   ← WebSocket client (+ client mock), aging, history

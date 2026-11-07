@@ -60,6 +60,44 @@ export interface Envelope {
   errors: Errors;
   frame: TelemetryFrame | null;
   dtc: DtcInfo;
+  lap: LapStatus;
+}
+
+// ---- Laps (recorded by the backend between Start and Stop) ------------------
+
+export interface LapStatus {
+  active: boolean;
+  id: number | null;
+  started_at: string | null;
+  elapsed_ms: number | null;
+  distance_km: number | null;
+}
+
+export interface FieldStats {
+  min: number | null;
+  max: number | null;
+  avg: number | null;
+}
+
+export interface LapSummary {
+  fields: Record<FieldName, FieldStats>;
+  distance_km: number;
+  codes: string[];
+  recovered?: boolean; // closed on startup after a crash / power loss
+}
+
+export interface LapRecord {
+  id: number;
+  mode: Mode;
+  started_at: string;
+  ended_at: string | null;
+  duration_s: number | null;
+  summary: LapSummary | null;
+}
+
+export interface LapDetail extends LapRecord {
+  sample_count: number;
+  samples: { t_ms: number[] } & Record<FieldName, (number | null)[]>;
 }
 
 // WebSocket connection state, separate from the STM link state.
@@ -79,6 +117,14 @@ export interface DtcState {
   codes: string[];
   ageMs: number | null;
   stale: boolean;
+}
+
+// Lap view model; elapsed time advanced locally between messages.
+export interface LapState {
+  active: boolean;
+  id: number | null;
+  elapsedMs: number | null;
+  distanceKm: number | null;
 }
 
 export interface HistoryPoint {

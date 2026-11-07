@@ -1,15 +1,19 @@
-// Top status bar: mode, connection health, error counters, and the unit toggle.
-// Explicit connection indicators are a hard requirement (handoff section 6).
+// Top status bar: mode, connection health, error counters, lap control, and
+// the menu button. Explicit connection indicators are a hard requirement
+// (handoff section 6).
 
 import { useTelemetry } from "../transport/useTelemetry";
 import type { UnitSystem } from "../lib/units";
+import type { LapRecord } from "../types/telemetry";
+import { LapControl } from "./LapControl";
 
 interface Props {
   system: UnitSystem;
-  onSystemChange: (s: UnitSystem) => void;
+  onMenu: () => void;
+  onLapStopped: (lap: LapRecord) => void;
 }
 
-export function StatusBar({ system, onSystemChange }: Props) {
+export function StatusBar({ system, onMenu, onLapStopped }: Props) {
   const t = useTelemetry();
 
   const modeLabel = t.mode === "mock" ? "MOCK" : t.mode === "live" ? "LIVE" : "—";
@@ -44,20 +48,11 @@ export function StatusBar({ system, onSystemChange }: Props) {
           sub={`p${errs.parse} o${errs.oversize} d${errs.decode} g${errs.seq_gaps}`}
         />
 
-        <div className="unit-toggle" role="group" aria-label="Unit system">
-          <button
-            className={system === "metric" ? "active" : ""}
-            onClick={() => onSystemChange("metric")}
-          >
-            Metric
-          </button>
-          <button
-            className={system === "imperial" ? "active" : ""}
-            onClick={() => onSystemChange("imperial")}
-          >
-            Imperial
-          </button>
-        </div>
+        <LapControl system={system} onStopped={onLapStopped} />
+
+        <button className="menu-btn" onClick={onMenu} aria-label="Open menu">
+          ☰ Menu
+        </button>
       </div>
     </header>
   );

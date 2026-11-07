@@ -139,6 +139,11 @@ export function toDisplay(
   return { value, unit, display, min, max, fraction };
 }
 
+export function fmtDistance(km: number | null, system: UnitSystem): string {
+  if (km === null) return "—";
+  return system === "imperial" ? `${(km * 0.621371).toFixed(2)} mi` : `${km.toFixed(2)} km`;
+}
+
 export function warnFraction(field: FieldName): number | undefined {
   return FIELD_META[field].warnFraction;
 }
