@@ -17,6 +17,9 @@ import { AnalogView } from "./views/AnalogView";
 import { HudView } from "./views/HudView";
 import { BarsView } from "./views/BarsView";
 import { OrbitView } from "./views/OrbitView";
+import { TougeView } from "./views/TougeView";
+import { LcdView } from "./views/LcdView";
+import { PodsView } from "./views/PodsView";
 import { fieldLabel, fmtDistance } from "../lib/units";
 import { fmtDuration } from "../lib/lapsApi";
 import type { FieldName, LapRecord } from "../types/telemetry";
@@ -89,6 +92,9 @@ export function Dashboard() {
       )}
 
       {view === "race" && <RaceView system={system} />}
+      {view === "touge" && <TougeView system={system} />}
+      {view === "lcd" && <LcdView system={system} />}
+      {view === "pods" && <PodsView system={system} />}
       {view === "analog" && <AnalogView system={system} />}
       {view === "hud" && <HudView system={system} />}
       {view === "bars" && <BarsView system={system} />}

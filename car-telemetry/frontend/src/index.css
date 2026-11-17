@@ -1505,3 +1505,649 @@ body {
   .shift-bar { gap: 3px; padding: 8px; }
   .bars { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* ======================================================================
+   More color themes (Menu > Color theme)
+   ====================================================================== */
+:root[data-theme="neon"] {
+  --bg: #0a0614;
+  --panel: #140c24;
+  --panel-2: #1d1233;
+  --line: #33224f;
+  --text: #f3e9ff;
+  --muted: #9b89b8;
+  --accent: #ff2bd6;
+  --accent-2: #22e4ff;
+  --on-accent: #1a0016;
+  --ok: #3dffa8;
+  --warn: #ffd23d;
+  --bad: #ff3d6e;
+}
+:root[data-theme="sunset"] {
+  --bg: #120a1a;
+  --panel: #1e1028;
+  --panel-2: #2a1636;
+  --line: #452a52;
+  --text: #ffe9f0;
+  --muted: #b48fa8;
+  --accent: #ff7a45;
+  --accent-2: #ff3d8b;
+  --on-accent: #200800;
+  --ok: #5cf2b0;
+  --warn: #ffd23d;
+  --bad: #ff3d5a;
+}
+:root[data-theme="purple"] {
+  --bg: #0c0a14;
+  --panel: #16122a;
+  --panel-2: #201a3a;
+  --line: #342c55;
+  --text: #ece8ff;
+  --muted: #958cb8;
+  --accent: #9d7bff;
+  --accent-2: #4fd1c5;
+  --on-accent: #0d0626;
+}
+:root[data-theme="rally"] {
+  --bg: #050d1f;
+  --panel: #0b1a36;
+  --panel-2: #11244a;
+  --line: #1f3a6b;
+  --text: #eaf1ff;
+  --muted: #8ea3c9;
+  --accent: #ffc21a;
+  --accent-2: #3d8bff;
+  --on-accent: #1d1400;
+}
+:root[data-theme="sakura"] {
+  --bg: #160d12;
+  --panel: #22141c;
+  --panel-2: #2e1a25;
+  --line: #4a2b3b;
+  --text: #ffeef5;
+  --muted: #c095aa;
+  --accent: #ff9cc8;
+  --accent-2: #b8f0ff;
+  --on-accent: #2a0716;
+}
+:root[data-theme="lcd"] {
+  --bg: #050a05;
+  --panel: #0b140b;
+  --panel-2: #112011;
+  --line: #1f3a1f;
+  --text: #c8ffb0;
+  --muted: #6f9a62;
+  --accent: #7dff4a;
+  --accent-2: #2ec27e;
+  --on-accent: #061400;
+  --ok: #7dff4a;
+  --warn: #e6ff3d;
+  --bad: #ff5a3d;
+}
+:root[data-theme="redzone"] {
+  --bg: #0a0505;
+  --panel: #150a0a;
+  --panel-2: #1f0f0f;
+  --line: #3a1a1a;
+  --text: #fff0ee;
+  --muted: #a88a86;
+  --accent: #ff2a2a;
+  --accent-2: #ff8a3d;
+  --on-accent: #1f0000;
+  --bad: #ffd23d; /* warnings must still stand out from a red accent */
+}
+:root[data-theme="pearl"] {
+  --bg: #f2f2ef;
+  --panel: #ffffff;
+  --panel-2: #e6e6e1;
+  --line: #cfcfc8;
+  --text: #111111;
+  --muted: #5d5d58;
+  --accent: #d4001a;
+  --accent-2: #1a1a1a;
+  --on-accent: #ffffff;
+  --ok: #138a3e;
+  --warn: #b26a00;
+  --bad: #c62828;
+  --banner-bad-text: #5c0d0d;
+  --banner-warn-text: #4a2c00;
+  --banner-ok-text: #0b3d1e;
+  color-scheme: light;
+}
+
+/* ---------- Seven-segment digits ---------- */
+.sevenseg {
+  display: block;
+  width: 100%;
+  height: auto;
+  /* one glow per display, not per segment: cheaper on the Pi */
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--accent) 55%, transparent));
+}
+.ss-on {
+  fill: var(--accent);
+}
+.ss-off {
+  fill: color-mix(in srgb, var(--accent) 9%, transparent);
+}
+.ss-dp.ss-off {
+  fill: transparent;
+}
+.stale .ss-on {
+  fill: var(--warn);
+}
+.nodata .ss-on,
+.unsupported .ss-on {
+  fill: var(--muted);
+}
+.stale .sevenseg,
+.nodata .sevenseg,
+.unsupported .sevenseg {
+  filter: none;
+}
+.hot .ss-on {
+  fill: var(--bad);
+}
+.hot .sevenseg {
+  filter: drop-shadow(0 0 4px var(--bad));
+}
+
+/* ---------- Glow upgrades for the earlier views ---------- */
+.race-speed-num {
+  text-shadow: 0 0 28px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.seg.on {
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+.bar-fill {
+  box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.ring-fill {
+  filter: drop-shadow(0 0 3px var(--ring));
+}
+
+/* ---------- Analog / Pods: needles, peaks, sweep ---------- */
+.dial.sweeping .dial-needle {
+  transition: none;
+}
+.dial-needle line {
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--accent) 80%, transparent));
+}
+.dial-peak {
+  transform-box: view-box;
+  transform-origin: 100px 100px;
+  transition: transform 0.4s ease-out;
+}
+.dial-peak line {
+  stroke: var(--bad);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  opacity: 0.85;
+}
+.dial.big .dial-face,
+.dial.small .dial-face {
+  stroke: color-mix(in srgb, var(--accent) 35%, var(--line));
+}
+
+/* ---------- Pods ---------- */
+.pods {
+  flex: 1;
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+.pods-rail {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 22px;
+  padding: 22px;
+  border-radius: 28px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 80%, #000), var(--bg));
+  border: 1px solid var(--line);
+  box-shadow: inset 0 2px 0 color-mix(in srgb, var(--text) 6%, transparent);
+}
+.dial.pod svg {
+  max-width: 300px;
+}
+.pod-bezel {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 4;
+  filter: drop-shadow(0 0 6px var(--accent));
+}
+.dial.pod .dial-face {
+  fill: #050507;
+  stroke: #000;
+  stroke-width: 3;
+}
+.dial.pod .dial-tick {
+  stroke: color-mix(in srgb, var(--accent) 50%, #fff);
+}
+.dial.pod .dial-tick.major {
+  stroke: #fff;
+}
+.dial.pod .dial-num {
+  fill: #f2f2f2;
+}
+.dial.pod .dial-name {
+  fill: var(--accent);
+}
+.dial.pod .dial-unit {
+  fill: #9a9a9a;
+}
+.dial.pod .dial-hub {
+  fill: #111;
+}
+.dial.pod.hot .pod-bezel {
+  stroke: var(--bad);
+  filter: drop-shadow(0 0 10px var(--bad));
+  animation: pod-alarm 0.5s steps(1) infinite alternate;
+}
+@keyframes pod-alarm {
+  50% { opacity: 0.25; }
+}
+.pods.no-peaks .dial-peak {
+  display: none;
+}
+.pods-toggle {
+  min-height: var(--touch);
+  padding: 0 18px;
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+/* ---------- Touge ---------- */
+.touge {
+  position: relative;
+  overflow: hidden;
+  flex: 1;
+  width: 100%;
+  padding: 18px 18px 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  isolation: isolate;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent-2) 10%, var(--bg)) 0%,
+    var(--bg) 55%
+  );
+}
+.touge > section {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 1100px;
+}
+.touge-sky {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 62%;
+  z-index: 0;
+  pointer-events: none;
+}
+.touge-sun {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: min(46vw, 460px);
+  aspect-ratio: 1;
+  transform: translate(-50%, 50%);
+  border-radius: 50%;
+  background: linear-gradient(180deg, var(--accent) 10%, var(--accent-2) 90%);
+  opacity: 0.35;
+  -webkit-mask-image: repeating-linear-gradient(180deg, #000 0 14px, transparent 14px 20px);
+  mask-image: repeating-linear-gradient(180deg, #000 0 14px, transparent 14px 20px);
+  filter: blur(0.5px);
+}
+.touge-ridge {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 28%;
+  background: var(--bg);
+  clip-path: polygon(
+    0 70%, 8% 40%, 15% 60%, 24% 20%, 33% 55%, 41% 35%, 50% 70%,
+    58% 30%, 66% 50%, 75% 15%, 84% 55%, 92% 35%, 100% 60%, 100% 100%, 0 100%
+  );
+  opacity: 0.9;
+}
+.touge-grid {
+  position: absolute;
+  left: -50%;
+  right: -50%;
+  bottom: 0;
+  height: 40%;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--accent) 55%, transparent) 2px, transparent 2px),
+    linear-gradient(90deg, color-mix(in srgb, var(--accent) 55%, transparent) 2px, transparent 2px);
+  background-size: 64px 64px;
+  transform: perspective(300px) rotateX(62deg);
+  transform-origin: 50% 100%;
+  -webkit-mask-image: linear-gradient(to top, #000 30%, transparent);
+  mask-image: linear-gradient(to top, #000 30%, transparent);
+  opacity: 0.6;
+}
+.touge-tach svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 45%, transparent));
+}
+.tseg {
+  fill: color-mix(in srgb, var(--text) 7%, transparent);
+  transition: fill 0.05s;
+}
+.tseg.z-lo.on { fill: var(--accent-2); }
+.tseg.z-mid.on { fill: var(--accent); }
+.tseg.z-hi.on { fill: var(--warn); }
+.tseg.z-red { fill: color-mix(in srgb, var(--bad) 22%, transparent); }
+.tseg.z-red.on { fill: var(--bad); }
+.touge-num {
+  fill: var(--text);
+  font-size: 16px;
+  font-weight: 800;
+  font-style: italic;
+}
+.touge-num.red { fill: var(--bad); }
+.touge-tach-cap {
+  fill: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+}
+.touge-shift {
+  position: absolute;
+  left: 50%;
+  top: 38%;
+  transform: translateX(-50%);
+  padding: 6px 18px;
+  border: 2px solid var(--bad);
+  border-radius: 8px;
+  color: var(--bad);
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  opacity: 0;
+  text-shadow: 0 0 10px var(--bad);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--bad) 50%, transparent);
+}
+.touge.shift .touge-shift {
+  animation: shift-flash 0.16s steps(1) infinite alternate;
+  opacity: 1;
+}
+.touge.shift .touge-tach svg {
+  filter: drop-shadow(0 0 12px var(--bad));
+}
+.touge-speed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: clamp(-150px, -13vw, -40px);
+}
+.touge-speed-digits {
+  width: min(52vw, 440px);
+}
+.touge-speed-cap {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.jp {
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+}
+.touge-rpm-digits {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+  margin-top: 6px;
+  color: var(--muted);
+  font-weight: 700;
+}
+.touge-rpm-digits .sevenseg {
+  width: 120px;
+}
+.touge-rpm-digits .ss-on {
+  fill: var(--accent-2);
+}
+.touge-boxes {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: auto;
+}
+.touge-box {
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--panel) 75%, transparent);
+  backdrop-filter: blur(6px);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line));
+  border-radius: 12px;
+  box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+.touge-box.hot {
+  border-color: var(--bad);
+  box-shadow: 0 0 20px color-mix(in srgb, var(--bad) 45%, transparent);
+}
+.touge-box-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.touge-box-head .jp {
+  font-size: 20px;
+}
+.touge-box-head .en {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.touge-box-digits {
+  max-width: 150px;
+}
+.touge-box-unit {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ---------- LCD ---------- */
+.lcd {
+  flex: 1;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 18px;
+  display: flex;
+}
+.lcd-glass {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  grid-template-areas:
+    "tach tach"
+    "speed gauges"
+    "foot foot";
+  gap: 18px 28px;
+  padding: 24px 28px;
+  border-radius: 22px;
+  border: 2px solid #000;
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.015) 0 2px, transparent 2px 4px),
+    radial-gradient(ellipse at 30% 0%, color-mix(in srgb, var(--accent) 7%, #070807), #020302 75%);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--accent) 15%, transparent),
+    inset 0 18px 40px rgba(0, 0, 0, 0.6),
+    0 10px 30px rgba(0, 0, 0, 0.4);
+  color: var(--accent);
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+.lcd-tach { grid-area: tach; }
+.lcd-speed { grid-area: speed; }
+.lcd-gauges { grid-area: gauges; }
+.lcd-foot { grid-area: foot; }
+.lcd-bars {
+  height: clamp(90px, 16vh, 170px);
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+}
+.lcd-bar {
+  flex: 1;
+  border-radius: 2px 2px 0 0;
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+}
+.lcd-bar.on {
+  background: var(--accent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 70%, transparent);
+}
+.lcd-bar.red { background: color-mix(in srgb, var(--bad) 14%, transparent); }
+.lcd-bar.red.on {
+  background: var(--bad);
+  box-shadow: 0 0 10px var(--bad);
+}
+.lcd-glass.shift .lcd-bar.on {
+  animation: shift-flash 0.16s steps(1) infinite alternate;
+}
+.lcd-scale {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-weight: 800;
+  font-style: italic;
+}
+.lcd-scale .red { color: var(--bad); }
+.lcd-cap {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 4px;
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  opacity: 0.8;
+}
+.lcd-rpm .sevenseg { width: 110px; }
+.lcd-speed {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.lcd-speed-digits {
+  max-width: 520px;
+}
+.lcd-speed-unit {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.4em;
+  text-align: right;
+  max-width: 520px;
+}
+.lcd-gauges {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+}
+.lcd-gauge-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.lcd-gauge-digits { width: 74px; }
+.lcd-blocks {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 4px;
+}
+.lcd-block {
+  flex: 1;
+  height: 16px;
+  transform: skewX(-12deg);
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+}
+.lcd-block.on {
+  background: var(--accent);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 70%, transparent);
+}
+.lcd-block.red { background: color-mix(in srgb, var(--bad) 16%, transparent); }
+.lcd-block.red.on { background: var(--bad); }
+.lcd-gauge.hot .lcd-block.on { background: var(--bad); }
+.lcd-end {
+  width: 26px;
+  font-size: 11px;
+  font-weight: 800;
+  text-align: center;
+  opacity: 0.8;
+}
+.lcd-foot {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--accent) 15%, transparent);
+}
+.lcd-trip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-right: auto;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  opacity: 0.5;
+}
+.lcd-trip.on { opacity: 1; }
+.lcd-trip-digits { width: 110px; }
+.lcd-tell {
+  padding: 6px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 12%, transparent);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  color: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.lcd-tell.on {
+  color: #120300;
+  background: var(--warn);
+  border-color: var(--warn);
+  box-shadow: 0 0 12px var(--warn);
+}
+
+/* ---------- New views: portrait / narrow screens ---------- */
+@media (orientation: portrait), (max-width: 900px) {
+  .pods-rail { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 14px; gap: 14px; }
+  .touge-boxes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .touge-speed-digits { width: min(70vw, 440px); }
+  .lcd-glass {
+    grid-template-columns: 1fr;
+    grid-template-areas: "tach" "speed" "gauges" "foot";
+    padding: 18px;
+  }
+}
+@media (max-width: 420px) {
+  .touge-shift { font-size: 12px; }
+  .lcd-foot { gap: 8px; }
+}
