@@ -1,8 +1,8 @@
-// Slide-over menu: display settings (layout, theme, units) and saved laps.
+// Slide-over menu: dashboard view, display settings (layout, theme, units) and saved laps.
 // Selecting a lap swaps the menu body for that lap's detail view.
 
 import { useEffect, useState } from "react";
-import { THEMES, useSettings, type LayoutMode } from "../lib/settings";
+import { THEMES, VIEWS, useSettings, type LayoutMode } from "../lib/settings";
 import { fmtDistance, toDisplay, type UnitSystem } from "../lib/units";
 import { fmtDate, fmtDuration, listLaps } from "../lib/lapsApi";
 import type { LapRecord } from "../types/telemetry";
@@ -49,6 +49,8 @@ export function Menu({ lapId, lapsVersion, onSelectLap, onClose }: Props) {
             </div>
 
             <div className="menu-body">
+              <ViewPicker />
+
               <section className="menu-section">
                 <h3>Layout</h3>
                 <div className="segmented" role="group" aria-label="Layout">
@@ -115,6 +117,48 @@ export function Menu({ lapId, lapsVersion, onSelectLap, onClose }: Props) {
         )}
       </aside>
     </div>
+  );
+}
+
+// Dashboard style: ‹ › step through the views; the list below jumps straight to one.
+function ViewPicker() {
+  const s = useSettings();
+  const i = Math.max(0, VIEWS.findIndex((v) => v.id === s.view));
+  const step = (d: number) => s.set({ view: VIEWS[(i + d + VIEWS.length) % VIEWS.length].id });
+  const cur = VIEWS[i];
+
+  return (
+    <section className="menu-section">
+      <h3>Dashboard view</h3>
+      <div className="view-stepper">
+        <button className="icon-btn" onClick={() => step(-1)} aria-label="Previous view">
+          ‹
+        </button>
+        <div className="view-current">
+          <span className="view-current-label">{cur.label}</span>
+          <span className="view-current-hint">
+            {cur.hint} · {i + 1}/{VIEWS.length}
+          </span>
+        </div>
+        <button className="icon-btn" onClick={() => step(1)} aria-label="Next view">
+          ›
+        </button>
+      </div>
+      <div className="view-chips" role="group" aria-label="Dashboard view">
+        {VIEWS.map((v) => (
+          <button
+            key={v.id}
+            className={`view-chip${v.id === s.view ? " active" : ""}`}
+            onClick={() => s.set({ view: v.id })}
+          >
+            {v.label}
+          </button>
+        ))}
+      </div>
+      {s.view !== "classic" && (
+        <p className="menu-note">Layout (below) applies to the Classic view.</p>
+      )}
+    </section>
   );
 }
 

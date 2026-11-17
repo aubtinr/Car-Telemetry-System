@@ -1,4 +1,5 @@
-// Top-level layout: status bar, two large gauges (Speed + RPM), four tiles,
+// Top-level layout: status bar, banners, then the chosen dashboard view.
+// The classic view (below) is two large gauges (Speed + RPM), four tiles,
 // trouble codes, and the 60 s trend, arranged for landscape (two columns) or
 // portrait (one column). Also owns the menu and the "lap saved" notice.
 
@@ -11,6 +12,11 @@ import { MetricTile } from "./MetricTile";
 import { TrendChart } from "./TrendChart";
 import { DtcPanel } from "./DtcPanel";
 import { Menu } from "./Menu";
+import { RaceView } from "./views/RaceView";
+import { AnalogView } from "./views/AnalogView";
+import { HudView } from "./views/HudView";
+import { BarsView } from "./views/BarsView";
+import { OrbitView } from "./views/OrbitView";
 import { fieldLabel, fmtDistance } from "../lib/units";
 import { fmtDuration } from "../lib/lapsApi";
 import type { FieldName, LapRecord } from "../types/telemetry";
@@ -20,7 +26,7 @@ const SAVED_NOTICE_MS = 10_000;
 
 export function Dashboard() {
   const t = useTelemetry();
-  const { units: system, orientation } = useSettings();
+  const { units: system, orientation, view } = useSettings();
   const [trendField, setTrendField] = useState<FieldName>("speed_kmh");
   const [menu, setMenu] = useState<{ open: boolean; lapId: number | null }>({
     open: false,
@@ -82,31 +88,39 @@ export function Dashboard() {
         </div>
       )}
 
-      <main className={`dash ${orientation}`}>
-        <div className="dash-primary">
-          <section className="gauges">
-            <div className="gauge-cell">
-              <div className="gauge-title">{fieldLabel("speed_kmh")}</div>
-              <Gauge field="speed_kmh" state={t.fields.speed_kmh} system={system} />
-            </div>
-            <div className="gauge-cell">
-              <div className="gauge-title">{fieldLabel("rpm")}</div>
-              <Gauge field="rpm" state={t.fields.rpm} system={system} />
-            </div>
-          </section>
+      {view === "race" && <RaceView system={system} />}
+      {view === "analog" && <AnalogView system={system} />}
+      {view === "hud" && <HudView system={system} />}
+      {view === "bars" && <BarsView system={system} />}
+      {view === "orbit" && <OrbitView system={system} />}
 
-          <section className="tiles">
-            {TILE_FIELDS.map((f) => (
-              <MetricTile key={f} field={f} state={t.fields[f]} system={system} />
-            ))}
-          </section>
-        </div>
+      {view === "classic" && (
+        <main className={`dash ${orientation}`}>
+          <div className="dash-primary">
+            <section className="gauges">
+              <div className="gauge-cell">
+                <div className="gauge-title">{fieldLabel("speed_kmh")}</div>
+                <Gauge field="speed_kmh" state={t.fields.speed_kmh} system={system} />
+              </div>
+              <div className="gauge-cell">
+                <div className="gauge-title">{fieldLabel("rpm")}</div>
+                <Gauge field="rpm" state={t.fields.rpm} system={system} />
+              </div>
+            </section>
 
-        <div className="dash-secondary">
-          <DtcPanel dtc={t.dtc} />
-          <TrendChart field={trendField} system={system} onFieldChange={setTrendField} />
-        </div>
-      </main>
+            <section className="tiles">
+              {TILE_FIELDS.map((f) => (
+                <MetricTile key={f} field={f} state={t.fields[f]} system={system} />
+              ))}
+            </section>
+          </div>
+
+          <div className="dash-secondary">
+            <DtcPanel dtc={t.dtc} />
+            <TrendChart field={trendField} system={system} onFieldChange={setTrendField} />
+          </div>
+        </main>
+      )}
 
       {menu.open && (
         <Menu

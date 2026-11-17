@@ -1,4 +1,4 @@
-// Display settings (theme, layout, units), remembered in this browser.
+// Display settings (theme, layout, units, dashboard view), remembered in this browser.
 // The theme is applied as data-theme on <html>; index.css defines each palette.
 
 import {
@@ -14,6 +14,17 @@ import type { UnitSystem } from "./units";
 export type ThemeId = "midnight" | "daylight" | "ember" | "track" | "night";
 export type LayoutMode = "auto" | "landscape" | "portrait";
 export type Orientation = "landscape" | "portrait";
+export type ViewId = "classic" | "race" | "analog" | "hud" | "bars" | "orbit";
+
+// Dashboard styles, in the order the menu's ‹ › buttons step through them.
+export const VIEWS: { id: ViewId; label: string; hint: string }[] = [
+  { id: "classic", label: "Classic", hint: "Gauges, tiles, codes and trend" },
+  { id: "race", label: "Race", hint: "Shift lights + big digital readouts" },
+  { id: "analog", label: "Analog", hint: "Needle gauges with tick marks" },
+  { id: "hud", label: "HUD", hint: "Huge speed, minimal, mirror option" },
+  { id: "bars", label: "Bars", hint: "Every sensor as a bar, with peaks" },
+  { id: "orbit", label: "Orbit", hint: "Sensor rings around the speed" },
+];
 
 // swatch = [background, accent], used for the picker buttons only.
 export const THEMES: { id: ThemeId; label: string; hint: string; swatch: [string, string] }[] = [
@@ -28,15 +39,27 @@ interface Settings {
   theme: ThemeId;
   layout: LayoutMode;
   units: UnitSystem;
+  view: ViewId;
+  hudMirror: boolean; // HUD view flipped for reading as a windshield reflection
 }
 
-const DEFAULTS: Settings = { theme: "midnight", layout: "auto", units: "imperial" };
+const DEFAULTS: Settings = {
+  theme: "midnight",
+  layout: "auto",
+  units: "imperial",
+  view: "classic",
+  hudMirror: false,
+};
 const STORAGE_KEY = "ct.settings.v1";
 
 function load(): Settings {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (raw) return { ...DEFAULTS, ...JSON.parse(raw) };
+    if (raw) {
+      const s: Settings = { ...DEFAULTS, ...JSON.parse(raw) };
+      if (!VIEWS.some((v) => v.id === s.view)) s.view = DEFAULTS.view;
+      return s;
+    }
   } catch {
     /* storage blocked or corrupt: use defaults */
   }
