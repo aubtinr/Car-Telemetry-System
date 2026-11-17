@@ -863,20 +863,10 @@ body {
 }
 
 /* ---------- Responsive ---------- */
+/* Narrow screens keep two columns: the dashboard must fit without scrolling. */
 @media (max-width: 760px) {
-  .dash.landscape {
-    grid-template-columns: 1fr;
-  }
-  .gauges {
-    grid-template-columns: 1fr;
-  }
   .tiles {
     grid-template-columns: repeat(2, 1fr);
-  }
-}
-@media (max-width: 420px) {
-  .tiles {
-    grid-template-columns: 1fr;
   }
 }
 
@@ -1492,7 +1482,7 @@ body {
 }
 
 /* ---------- Views: portrait / narrow screens ---------- */
-@media (orientation: portrait), (max-width: 900px) {
+@media (orientation: portrait) {
   .race-grid { grid-template-columns: 1fr; }
   .race-speed { order: -1; }
   .analog-main { grid-template-columns: 1fr; }
@@ -2137,7 +2127,7 @@ body {
 }
 
 /* ---------- New views: portrait / narrow screens ---------- */
-@media (orientation: portrait), (max-width: 900px) {
+@media (orientation: portrait) {
   .pods-rail { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 14px; gap: 14px; }
   .touge-boxes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .touge-speed-digits { width: min(70vw, 440px); }
@@ -2150,4 +2140,447 @@ body {
 @media (max-width: 420px) {
   .touge-shift { font-size: 12px; }
   .lcd-foot { gap: 8px; }
+}
+
+/* ======================================================================
+   Fit to screen: the dashboard never scrolls. The app is exactly one screen
+   tall; each view gets whatever height is left under the status bar and
+   banners, and sizes its gauges and digits from that space using container
+   units (cqh / cqw = 1% of the view's height / width). Keep this section last
+   so it overrides the sizes above.
+   ====================================================================== */
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
+}
+.app {
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+.statusbar,
+.banner {
+  flex: none;
+}
+.dash,
+.race,
+.touge,
+.lcd,
+.pods,
+.analog,
+.hud-wrap,
+.bars,
+.orbit {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+  container-type: size;
+  padding: 12px;
+  gap: 12px;
+}
+
+/* ---------- Classic ---------- */
+.dash.landscape {
+  grid-template-rows: minmax(0, 1fr);
+  align-items: stretch;
+}
+.dash.landscape .dash-primary {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 12px;
+  min-height: 0;
+}
+.dash.landscape .dash-secondary {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+  min-height: 0;
+}
+.dash.portrait {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1.3fr) auto auto minmax(0, 1fr);
+}
+.dash.portrait .dash-primary,
+.dash.portrait .dash-secondary {
+  display: contents;
+}
+.gauges {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 12px;
+  min-height: 0;
+}
+.gauge-cell {
+  min-height: 0;
+  padding: 8px 10px 4px;
+}
+.gauge {
+  flex: 1;
+  min-height: 0;
+  max-width: none;
+  width: 100%;
+}
+.gauge svg {
+  height: 100%;
+  width: 100%;
+}
+.tiles {
+  gap: 10px;
+}
+.tile {
+  min-height: 0;
+  padding: min(14px, 2cqh) 12px;
+  gap: min(8px, 1.2cqh);
+}
+.tile-value {
+  font-size: clamp(18px, 6cqh, 34px);
+}
+.dtc {
+  padding: min(14px, 2cqh) 14px;
+  gap: 6px;
+  max-height: 34cqh;
+  overflow: hidden;
+}
+.dtc-summary {
+  font-size: clamp(16px, 4cqh, 22px);
+}
+.trend {
+  min-height: 0;
+  padding: min(14px, 2cqh) 14px;
+  gap: min(10px, 1.5cqh);
+}
+.trend-svg {
+  flex: 1 1 0;
+  min-height: 30px;
+  height: auto;
+}
+.trend-picker {
+  gap: 6px;
+}
+.trend-picker button {
+  min-height: clamp(30px, 7cqh, 48px);
+  padding: 0 10px;
+}
+
+/* ---------- Race ---------- */
+.race-grid {
+  flex: 1 1 0;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 12px;
+}
+.race-grid > section {
+  overflow: hidden;
+  padding: min(16px, 2.5cqh);
+}
+.shift-bar {
+  flex: none;
+  padding: min(10px, 1.5cqh);
+}
+.led {
+  max-width: min(34px, 7cqh);
+}
+.race-rpm-num {
+  font-size: min(92px, 13cqh, 7cqw);
+}
+.rpm-segs {
+  height: min(34px, 6cqh);
+}
+.race-speed-num {
+  font-size: min(240px, 34cqh, 14cqw);
+}
+.race-speed-unit {
+  font-size: min(18px, 3.5cqh);
+}
+.race-boxes {
+  grid-template-rows: repeat(4, minmax(0, 1fr));
+  gap: min(10px, 1.5cqh);
+}
+.race-box {
+  padding: 4px 12px;
+  min-height: 0;
+}
+.race-box-val {
+  font-size: min(26px, 5.5cqh);
+}
+.race-foot {
+  flex: none;
+  gap: 12px;
+}
+.race-lap,
+.race-cel {
+  padding: min(12px, 1.6cqh) 16px;
+}
+.race-lap-time {
+  font-size: min(32px, 6cqh);
+}
+
+/* ---------- Analog ---------- */
+.analog-main {
+  flex: 1.7 1 0;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 12px;
+}
+.analog-small {
+  flex: 1 1 0;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 12px;
+}
+.dial {
+  min-height: 0;
+  min-width: 0;
+  height: 100%;
+}
+.dial svg,
+.dial.big svg,
+.dial.small svg,
+.dial.pod svg {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+}
+
+/* ---------- Pods ---------- */
+.pods-rail {
+  flex: 1 1 0;
+  min-height: 0;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: min(22px, 3cqh);
+  padding: min(22px, 3cqh);
+}
+.pods-toggle {
+  flex: none;
+  min-height: clamp(30px, 7cqh, 48px);
+}
+
+/* ---------- HUD ---------- */
+.hud-wrap {
+  gap: min(24px, 3cqh);
+}
+.hud {
+  gap: min(8px, 1cqh);
+}
+.hud-speed {
+  font-size: min(420px, 44cqh, 30cqw);
+}
+.hud-unit {
+  font-size: min(30px, 5cqh);
+}
+.hud-rpm {
+  margin-top: min(24px, 3cqh);
+}
+.hud-alerts {
+  min-height: 0;
+  margin-top: min(12px, 1.5cqh);
+}
+.hud-mirror-btn {
+  min-height: clamp(30px, 7cqh, 48px);
+}
+
+/* ---------- Bars ---------- */
+.bars {
+  grid-template-rows: minmax(0, 1fr);
+}
+.bar-col {
+  min-height: 0;
+  padding: min(14px, 2cqh) 8px;
+  gap: min(6px, 1cqh);
+}
+.bar-val {
+  font-size: min(40px, 7cqh, 3.2cqw);
+}
+.bar-track {
+  min-height: 0;
+}
+
+/* ---------- Orbit ---------- */
+.orbit {
+  grid-template-rows: minmax(0, 1fr);
+}
+.orbit-rings {
+  height: 100%;
+  min-height: 0;
+}
+.orbit-rings svg {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+}
+.orbit-legend {
+  gap: min(10px, 1.5cqh);
+}
+.orbit-legend li {
+  padding: min(12px, 1.8cqh) 16px;
+}
+.orbit-val {
+  font-size: min(24px, 5cqh);
+}
+
+/* ---------- Touge ---------- */
+.touge {
+  padding-bottom: 12px;
+}
+.touge-tach svg {
+  max-height: 44cqh;
+}
+.touge-speed {
+  flex: none;
+  margin-top: calc(-0.4 * min(44cqh, 100cqw / 2.55));
+}
+.touge-speed-digits {
+  width: auto;
+  height: min(208px, 22cqh);
+  max-width: 100%;
+}
+.touge-speed-cap {
+  font-size: min(18px, 3.5cqh);
+}
+.touge-rpm-digits {
+  margin-top: 2px;
+}
+.touge-rpm-digits .sevenseg {
+  width: auto;
+  height: min(44px, 5cqh);
+}
+.touge-boxes {
+  flex: none;
+  gap: 10px;
+}
+.touge-box {
+  padding: min(10px, 1.5cqh) 12px;
+}
+.touge-box-head {
+  margin-bottom: 2px;
+}
+.touge-box-head .jp {
+  font-size: min(20px, 4cqh);
+}
+.touge-box-digits {
+  width: auto;
+  height: min(70px, 8cqh);
+  max-width: 100%;
+}
+.touge-box-unit {
+  margin-top: 2px;
+}
+
+/* ---------- LCD ---------- */
+.lcd-glass {
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: min(18px, 2.5cqh) 28px;
+  padding: min(24px, 3cqh) 24px;
+  overflow: hidden;
+}
+.lcd-bars {
+  height: min(170px, 22cqh);
+}
+.lcd-rpm .sevenseg {
+  width: auto;
+  height: min(40px, 5cqh);
+}
+.lcd-speed {
+  min-height: 0;
+  align-items: flex-start;
+}
+.lcd-speed-digits {
+  width: auto;
+  height: min(245px, 30cqh);
+  max-width: 100%;
+}
+.lcd-speed-unit {
+  font-size: min(20px, 3.5cqh);
+}
+.lcd-gauges {
+  min-height: 0;
+  gap: min(14px, 1.8cqh);
+}
+.lcd-gauge-digits {
+  width: auto;
+  height: min(35px, 4.5cqh);
+}
+.lcd-block {
+  height: min(16px, 2.6cqh);
+}
+.lcd-foot {
+  padding-top: min(12px, 1.5cqh);
+}
+.lcd-trip-digits {
+  width: auto;
+  height: min(40px, 5cqh);
+}
+
+/* ---------- Portrait versions ---------- */
+@media (orientation: portrait) {
+  .race-grid {
+    grid-template-rows: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .race-boxes {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+  }
+  .race-speed-num {
+    font-size: min(240px, 22cqh, 30cqw);
+  }
+  .race-rpm-num {
+    font-size: min(92px, 8cqh, 16cqw);
+  }
+
+  .analog-main {
+    flex: 2.4 1 0;
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+  }
+  .analog-small {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .pods-rail {
+    grid-template-rows: repeat(3, minmax(0, 1fr));
+  }
+
+  .bars {
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+  }
+  .bar-col {
+    min-height: 0;
+  }
+  .bar-val {
+    font-size: min(40px, 4.5cqh, 8cqw);
+  }
+
+  .orbit {
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+  .orbit-legend {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .touge-tach svg {
+    max-height: 30cqh;
+  }
+  .touge-speed {
+    margin-top: calc(-0.35 * min(30cqh, 100cqw / 2.55));
+  }
+  .touge-speed-digits {
+    height: min(208px, 16cqh);
+  }
+
+  .lcd-glass {
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+  }
+  .lcd-speed-digits {
+    height: min(245px, 18cqh);
+  }
+}
+@media (max-width: 420px) {
+  .bars {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
